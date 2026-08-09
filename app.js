@@ -37,10 +37,31 @@ const app = express();
 app.use(helmet());
 
 // CORS
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://kalyanamala-frontend-j11gdtcp7-prabhukanthbs-projects.vercel.app',
+  'https://kalyanamala-frontend.vercel.app'
+];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: function (origin, callback) {
+    // Allow requests with no origin like Postman, curl, mobile apps
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app')
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET','POST','PUT','DELETE','OPTIONS','PATCH'],
+  allowedHeaders: ['Content-Type','Authorization']
 }));
 
 // Body Parser
