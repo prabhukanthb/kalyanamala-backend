@@ -40,19 +40,22 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'https://kalyanamala-frontend-j11gdtcp7-prabhukanthbs-projects.vercel.app',
-  'https://kalyanamala-frontend.vercel.app'
+  'https://newkalyanamala.com',
+  'https://www.newkalyanamala.com',
+  'https://kalyanamala.com',
+  'https://www.kalyanamala.com',
+  'https://newkalyanamala.org',
+  'https://www.newkalyanamala.org',
+  'https://kalyanamala-frontend.vercel.app',
+  'https://kalyanamala-frontend-j11gdtcp7-prabhukanthbs-projects.vercel.app'
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests without origin like curl/Postman/mobile apps
     if (!origin) return callback(null, true);
 
-    if (
-      allowedOrigins.includes(origin) ||
-      origin.endsWith('.vercel.app')
-    ) {
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
 
@@ -61,7 +64,10 @@ app.use(cors({
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','OPTIONS','PATCH'],
   allowedHeaders: ['Content-Type','Authorization']
-}));
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Body Parser
 app.use(express.json({ limit: '10mb' }));
