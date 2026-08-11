@@ -6,34 +6,35 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult, param } = require('express-validator');
+const jwt = require('jsonwebtoken');
 
-// Import Models (will be created later)
-// const Profile = require('../models/Profile');
-// const User = require('../models/User');
+const Profile = require('../models/Profile');
+const User = require('../models/User');
 
 // ==========================================
 // MIDDLEWARE
 // ==========================================
 
-// Auth Middleware - Verify JWT Token
 const authMiddleware = (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
     if (!token) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'No token provided',
         message: 'Authorization token is required'
       });
     }
 
-    const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.userId = decoded.userId;
     req.userRole = decoded.role;
     next();
   } catch (error) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: 'Invalid token',
       message: 'Authentication failed'
     });
@@ -45,7 +46,7 @@ const authMiddleware = (req, res, next) => {
 // ==========================================
 
 const createProfileValidation = [
-  body('gender').isIn(['male','female']).withMessage('Invalid gender'),
+  body('gender').isIn(['male','female','other']).withMessage('Invalid gender'),
   body('dateOfBirth').isISO8601().withMessage('Valid date is required'),
   body('height').matches(/^[0-9]{1,3}cm$/).withMessage('Height format: e.g., 170cm'),
   body('religion').trim().notEmpty().withMessage('Religion is required'),
@@ -55,12 +56,12 @@ const createProfileValidation = [
   body('state').trim().notEmpty().withMessage('State is required'),
   body('country').trim().notEmpty().withMessage('Country is required'),
   body('education').trim().notEmpty().withMessage('Education is required'),
-  body('income').matches(/^[0-9]+$/).withMessage('Income must be numeric'),
-  body('about').trim().isLength({ max: 500 }).withMessage('About must be max 500 characters')
+  body('income').isNumeric().withMessage('Income must be numeric'),
+  body('about').optional().trim().isLength({ max: 1000 }).withMessage('About must be max 1000 characters')
 ];
 
 const updateProfileValidation = [
-  body('gender').optional().isIn(['male','female']).withMessage('Invalid gender'),
+  body('gender').optional().isIn(['male','female','other']).withMessage('Invalid gender'),
   body('dateOfBirth').optional().isISO8601().withMessage('Valid date is required'),
   body('height').optional().matches(/^[0-9]{1,3}cm$/).withMessage('Height format: e.g., 170cm'),
   body('religion').optional().trim().notEmpty().withMessage('Religion is required'),
@@ -70,18 +71,18 @@ const updateProfileValidation = [
   body('state').optional().trim().notEmpty().withMessage('State is required'),
   body('country').optional().trim().notEmpty().withMessage('Country is required'),
   body('education').optional().trim().notEmpty().withMessage('Education is required'),
-  body('income').optional().matches(/^[0-9]+$/).withMessage('Income must be numeric'),
-  body('about').optional().trim().isLength({ max: 500 }).withMessage('About must be max 500 characters')
+  body('income').optional().isNumeric().withMessage('Income must be numeric'),
+  body('about').optional().trim().isLength({ max: 1000 }).withMessage('About must be max 1000 characters')
 ];
 
 const searchValidation = [
-  body('gender').optional().isIn(['male','female']).withMessage('Invalid gender'),
+  body('gender').optional().isIn(['male','female','other']).withMessage('Invalid gender'),
   body('ageFrom').optional().isInt({ min: 18, max: 100 }).withMessage('Age from must be 18-100'),
   body('ageTo').optional().isInt({ min: 18, max: 100 }).withMessage('Age to must be 18-100'),
   body('city').optional().trim().notEmpty().withMessage('City is required'),
   body('religion').optional().trim().notEmpty().withMessage('Religion is required'),
-  body('incomeFrom').optional().matches(/^[0-9]+$/).withMessage('Income must be numeric'),
-  body('incomeTo').optional().matches(/^[0-9]+$/).withMessage('Income must be numeric'),
+  body('incomeFrom').optional().isNumeric().withMessage('Income must be numeric'),
+  body('incomeTo').optional().isNumeric().withMessage('Income must be numeric'),
   body('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100'),
   body('page').optional().isInt({ min: 1 }).withMessage('Page must be positive number')
 ];
@@ -91,38 +92,43 @@ const searchValidation = [
 // Create new profile (Protected)
 // ==========================================
 
-router.post('/', 
+router.post(
+  '/',
   authMiddleware,
   createProfileValidation,
   async (req, res) => {
     try {
-      // Check validation errors
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Validation failed',
           details: errors.array().map(e => e.msg)
         });
       }
 
-      const {
-        gender, dateOfBirth, height, religion, caste, occupation,
-        city, state, country, education, income, about
-      } = req.body;
-
-      // TODO: Uncomment when Profile model is created
-      /*
-      // Check if profile already exists for this user
       const existingProfile = await Profile.findOne({ userId: req.userId });
-      
       if (existingProfile) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Profile already exists',
           message: 'User can only have one profile'
         });
       }
 
-      // Create new profile
+      const {
+        gender,
+        dateOfBirth,
+        height,
+        religion,
+        caste,
+        occupation,
+        city,
+        state,
+        country,
+        education,
+        income,
+        about
+      } = req.body;
+
       const profile = new Profile({
         userId: req.userId,
         gender,
@@ -131,21 +137,21 @@ router.post('/',
         religion,
         caste,
         occupation,
+        education,
+        income,
+        about: about || null,
         location: {
           city,
           state,
           country
         },
-        education,
-        income,
-        about,
-        isComplete: true,
-        createdAt: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
 
       await profile.save();
 
-      res.status(201).json({
+      return res.status(201).json({
         message: 'Profile created successfully',
         profile: {
           id: profile._id,
@@ -156,22 +162,16 @@ router.post('/',
           occupation: profile.occupation,
           city: profile.location.city,
           education: profile.education,
-          income: profile.income
+          income: profile.income,
+          profileCompletion: profile.profileCompletion,
+          isComplete: profile.isComplete
         }
       });
-      */
-
-      // Temporary response
-      res.status(201).json({
-        message: 'Profile creation endpoint ready',
-        note: 'Profile model needs to be created first'
-      });
-
     } catch (error) {
       console.error('Create profile error:', error);
-      res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to create profile',
-        message: error.message 
+        message: error.message
       });
     }
   }
@@ -184,51 +184,44 @@ router.post('/',
 
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    // TODO: Uncomment when Profile model is created
-    /*
     const profile = await Profile.findOne({ userId: req.userId })
       .populate('userId', 'email firstName lastName phone');
 
     if (!profile) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Profile not found',
         message: 'Please create a profile first'
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       profile: {
         id: profile._id,
+        user: profile.userId,
         gender: profile.gender,
         dateOfBirth: profile.dateOfBirth,
         height: profile.height,
+        bodyType: profile.bodyType,
+        complexion: profile.complexion,
         religion: profile.religion,
         caste: profile.caste,
         occupation: profile.occupation,
-        city: profile.location.city,
-        state: profile.location.state,
-        country: profile.location.country,
+        location: profile.location,
         education: profile.education,
         income: profile.income,
         about: profile.about,
-        isComplete: profile.isComplete,
         photos: profile.photos,
+        profileCompletion: profile.profileCompletion,
+        isComplete: profile.isComplete,
         createdAt: profile.createdAt,
         updatedAt: profile.updatedAt
       }
     });
-    */
-
-    res.status(200).json({
-      message: 'Get profile endpoint ready',
-      userId: req.userId
-    });
-
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({
       error: 'Failed to fetch profile',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -238,60 +231,52 @@ router.get('/me', authMiddleware, async (req, res) => {
 // Get specific profile by ID
 // ==========================================
 
-router.get('/:id', 
+router.get(
+  '/:id',
   param('id').isMongoId().withMessage('Invalid profile ID'),
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Validation failed',
           details: errors.array().map(e => e.msg)
         });
       }
 
-      const { id } = req.params;
-
-      // TODO: Uncomment when Profile model is created
-      /*
-      const profile = await Profile.findById(id)
-        .populate('userId', 'email firstName lastName');
+      const profile = await Profile.findById(req.params.id)
+        .populate('userId', 'email firstName lastName phone');
 
       if (!profile) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: 'Profile not found'
         });
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         profile: {
           id: profile._id,
-          name: `${profile.userId.firstName} ${profile.userId.lastName}`,
+          user: profile.userId,
           gender: profile.gender,
-          age: calculateAge(profile.dateOfBirth),
+          age: profile.age,
           height: profile.height,
           religion: profile.religion,
           caste: profile.caste,
           occupation: profile.occupation,
-          city: profile.location.city,
+          location: profile.location,
           education: profile.education,
           income: profile.income,
           about: profile.about,
-          photos: profile.photos
+          photos: profile.photos,
+          profileCompletion: profile.profileCompletion,
+          isComplete: profile.isComplete
         }
       });
-      */
-
-      res.status(200).json({
-        message: 'Get specific profile endpoint ready',
-        profileId: id
-      });
-
     } catch (error) {
       console.error('Get profile by ID error:', error);
-      res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to fetch profile',
-        message: error.message 
+        message: error.message
       });
     }
   }
@@ -302,34 +287,65 @@ router.get('/:id',
 // Update current user's profile (Protected)
 // ==========================================
 
-router.put('/me',
+router.put(
+  '/me',
   authMiddleware,
   updateProfileValidation,
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Validation failed',
           details: errors.array().map(e => e.msg)
         });
       }
 
-      // TODO: Uncomment when Profile model is created
-      /*
-      const profile = await Profile.findOneAndUpdate(
-        { userId: req.userId },
-        { ...req.body, updatedAt: new Date() },
-        { new: true, runValidators: true }
-      );
+      const profile = await Profile.findOne({ userId: req.userId });
 
       if (!profile) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           error: 'Profile not found'
         });
       }
 
-      res.status(200).json({
+      const {
+        gender,
+        dateOfBirth,
+        height,
+        bodyType,
+        complexion,
+        religion,
+        caste,
+        occupation,
+        city,
+        state,
+        country,
+        education,
+        income,
+        about
+      } = req.body;
+
+      if (gender !== undefined) profile.gender = gender;
+      if (dateOfBirth !== undefined) profile.dateOfBirth = dateOfBirth;
+      if (height !== undefined) profile.height = height;
+      if (bodyType !== undefined) profile.bodyType = bodyType;
+      if (complexion !== undefined) profile.complexion = complexion;
+      if (religion !== undefined) profile.religion = religion;
+      if (caste !== undefined) profile.caste = caste;
+      if (occupation !== undefined) profile.occupation = occupation;
+      if (education !== undefined) profile.education = education;
+      if (income !== undefined) profile.income = income;
+      if (about !== undefined) profile.about = about;
+
+      if (city !== undefined) profile.location.city = city;
+      if (state !== undefined) profile.location.state = state;
+      if (country !== undefined) profile.location.country = country;
+
+      profile.updatedAt = new Date();
+      await profile.save();
+
+      return res.status(200).json({
         message: 'Profile updated successfully',
         profile: {
           id: profile._id,
@@ -340,20 +356,16 @@ router.put('/me',
           city: profile.location.city,
           education: profile.education,
           income: profile.income,
+          profileCompletion: profile.profileCompletion,
+          isComplete: profile.isComplete,
           updatedAt: profile.updatedAt
         }
       });
-      */
-
-      res.status(200).json({
-        message: 'Profile update endpoint ready'
-      });
-
     } catch (error) {
       console.error('Update profile error:', error);
-      res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to update profile',
-        message: error.message 
+        message: error.message
       });
     }
   }
@@ -366,30 +378,22 @@ router.put('/me',
 
 router.delete('/me', authMiddleware, async (req, res) => {
   try {
-    // TODO: Uncomment when Profile model is created
-    /*
     const profile = await Profile.findOneAndDelete({ userId: req.userId });
 
     if (!profile) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Profile not found'
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Profile deleted successfully'
     });
-    */
-
-    res.status(200).json({
-      message: 'Profile delete endpoint ready'
-    });
-
   } catch (error) {
     console.error('Delete profile error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({
       error: 'Failed to delete profile',
-      message: error.message 
+      message: error.message
     });
   }
 });
@@ -399,27 +403,32 @@ router.delete('/me', authMiddleware, async (req, res) => {
 // Search profiles with filters
 // ==========================================
 
-router.post('/search',
+router.post(
+  '/search',
   searchValidation,
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Validation failed',
           details: errors.array().map(e => e.msg)
         });
       }
 
       const {
-        gender, ageFrom, ageTo, city, religion, incomeFrom, incomeTo,
-        limit = 10, page = 1
+        gender,
+        ageFrom,
+        ageTo,
+        city,
+        religion,
+        incomeFrom,
+        incomeTo,
+        limit = 10,
+        page = 1
       } = req.body;
 
-      // TODO: Uncomment when Profile model is created
-      /*
-      // Build search query
-      let query = {};
+      const query = {};
 
       if (gender) query.gender = gender;
       if (city) query['location.city'] = { $regex: city, $options: 'i' };
@@ -428,65 +437,48 @@ router.post('/search',
       if (ageFrom || ageTo) {
         query.dateOfBirth = {};
         if (ageFrom) {
-          const toDateFrom = new Date();
-          toDateFrom.setFullYear(toDateFrom.getFullYear() - ageFrom);
-          query.dateOfBirth.$lte = toDateFrom;
+          const fromDate = new Date();
+          fromDate.setFullYear(fromDate.getFullYear() - Number(ageFrom));
+          query.dateOfBirth.$lte = fromDate;
         }
         if (ageTo) {
-          const toDateTo = new Date();
-          toDateTo.setFullYear(toDateTo.getFullYear() - ageTo);
-          query.dateOfBirth.$gte = toDateTo;
+          const toDate = new Date();
+          toDate.setFullYear(toDate.getFullYear() - Number(ageTo));
+          query.dateOfBirth.$gte = toDate;
         }
       }
 
       if (incomeFrom || incomeTo) {
         query.income = {};
-        if (incomeFrom) query.income.$gte = parseInt(incomeFrom);
-        if (incomeTo) query.income.$lte = parseInt(incomeTo);
+        if (incomeFrom) query.income.$gte = Number(incomeFrom);
+        if (incomeTo) query.income.$lte = Number(incomeTo);
       }
 
-      // Execute search with pagination
-      const skip = (page - 1) * limit;
+      const skip = (Number(page) - 1) * Number(limit);
+
       const profiles = await Profile.find(query)
-        .limit(parseInt(limit))
+        .limit(Number(limit))
         .skip(skip)
-        .select('-userId')
+        .populate('userId', 'firstName lastName')
         .lean();
 
       const total = await Profile.countDocuments(query);
 
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Search results',
         pagination: {
           total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          pages: Math.ceil(total / limit)
+          page: Number(page),
+          limit: Number(limit),
+          pages: Math.ceil(total / Number(limit))
         },
-        profiles: profiles.map(p => ({
-          id: p._id,
-          gender: p.gender,
-          age: calculateAge(p.dateOfBirth),
-          religion: p.religion,
-          caste: p.caste,
-          occupation: p.occupation,
-          city: p.location.city,
-          education: p.education,
-          income: p.income
-        }))
+        profiles
       });
-      */
-
-      res.status(200).json({
-        message: 'Profile search endpoint ready',
-        note: 'Profile model needs to be created first'
-      });
-
     } catch (error) {
       console.error('Search profiles error:', error);
-      res.status(500).json({ 
+      return res.status(500).json({
         error: 'Search failed',
-        message: error.message 
+        message: error.message
       });
     }
   }
@@ -497,59 +489,42 @@ router.post('/search',
 // Mark profile as viewed
 // ==========================================
 
-router.post('/:id/view',
+router.post(
+  '/:id/view',
   authMiddleware,
   param('id').isMongoId().withMessage('Invalid profile ID'),
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Validation failed',
           details: errors.array().map(e => e.msg)
         });
       }
 
-      // TODO: Implement view tracking
-      /*
-      - Record view in ProfileView collection
-      - Update view count
-      - Check if already viewed today
-      */
+      const profile = await Profile.findById(req.params.id);
+      if (!profile) {
+        return res.status(404).json({
+          error: 'Profile not found'
+        });
+      }
 
-      res.status(200).json({
+      profile.statistics.viewCount += 1;
+      profile.statistics.lastViewedAt = new Date();
+      await profile.save();
+
+      return res.status(200).json({
         message: 'Profile view recorded'
       });
-
     } catch (error) {
       console.error('Mark view error:', error);
-      res.status(500).json({ 
+      return res.status(500).json({
         error: 'Failed to record view',
-        message: error.message 
+        message: error.message
       });
     }
   }
 );
-
-// ==========================================
-// HELPER FUNCTIONS
-// ==========================================
-
-// Calculate age from date of birth
-function calculateAge(dateOfBirth) {
-  const today = new Date();
-  let age = today.getFullYear() - new Date(dateOfBirth).getFullYear();
-  const monthDiff = today.getMonth() - new Date(dateOfBirth).getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < new Date(dateOfBirth).getDate())) {
-    age--;
-  }
-  
-  return age;
-}
-
-// ==========================================
-// EXPORT ROUTER
-// ==========================================
 
 module.exports = router;
