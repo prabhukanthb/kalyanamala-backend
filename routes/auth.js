@@ -8,7 +8,11 @@ const User = require('../models/User');
 
 const authMiddleware = (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
     if (!token) {
       return res.status(401).json({
         error: 'No token provided',
@@ -49,7 +53,7 @@ const registerValidation = [
       throw new Error('Passwords do not match');
     }
     return true;
-  }).withMessage('Passwords do not match')
+  })
 ];
 
 const loginValidation = [
@@ -78,7 +82,10 @@ router.post('/register', registerValidation, async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS || 10));
+    const hashedPassword = await bcrypt.hash(
+      password,
+      parseInt(process.env.BCRYPT_ROUNDS || '10', 10)
+    );
 
     const user = new User({
       email,
@@ -104,7 +111,8 @@ router.post('/register', registerValidation, async (req, res) => {
       { expiresIn: `${process.env.JWT_EXPIRY || 30}d` }
     );
 
-    res.status(201).json({
+    return res.status(201).json({
+      success: true,
       message: 'Registration successful',
       token,
       user: {
@@ -118,7 +126,8 @@ router.post('/register', registerValidation, async (req, res) => {
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       error: 'Registration failed',
       message: error.message
     });
@@ -151,13 +160,6 @@ router.post('/login', loginValidation, async (req, res) => {
       });
     }
 
-    if (!user.password) {
-      return res.status(500).json({
-        error: 'Login failed',
-        message: 'User record is missing password data. Please register again.'
-      });
-    }
-
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
@@ -173,7 +175,8 @@ router.post('/login', loginValidation, async (req, res) => {
       { expiresIn: `${process.env.JWT_EXPIRY || 30}d` }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: 'Login successful',
       token,
       user: {
@@ -187,7 +190,8 @@ router.post('/login', loginValidation, async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       error: 'Login failed',
       message: error.message
     });
@@ -196,12 +200,14 @@ router.post('/login', loginValidation, async (req, res) => {
 
 router.post('/logout', authMiddleware, (req, res) => {
   try {
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: 'Logged out successfully',
       note: 'Client should clear localStorage token'
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       error: 'Logout failed',
       message: error.message
     });
@@ -230,13 +236,13 @@ router.post(
         });
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Password reset link sent to email',
         note: 'Check your email for reset instructions'
       });
     } catch (error) {
       console.error('Password reset error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Password reset failed',
         message: error.message
       });
@@ -271,12 +277,12 @@ router.put(
       user.emailVerified = true;
       await user.save();
 
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Email verified successfully'
       });
     } catch (error) {
       console.error('Email verification error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Email verification failed',
         message: error.message
       });
@@ -292,7 +298,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       user: {
         id: user._id,
         email: user.email,
@@ -308,7 +314,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Failed to fetch profile',
       message: error.message
     });
@@ -328,7 +334,7 @@ router.put(
       throw new Error('Passwords do not match');
     }
     return true;
-  }).withMessage('Passwords do not match'),
+  }),
   async (req, res) => {
     try {
       const errors = validationResult(req);
@@ -355,17 +361,21 @@ router.put(
         });
       }
 
-      const hashedPassword = await bcrypt.hash(newPassword, parseInt(process.env.BCRYPT_ROUNDS || 10));
+      const hashedPassword = await bcrypt.hash(
+        newPassword,
+        parseInt(process.env.BCRYPT_ROUNDS || '10', 10)
+      );
+
       user.password = hashedPassword;
       user.updatedAt = new Date();
       await user.save();
 
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Password changed successfully'
       });
     } catch (error) {
       console.error('Change password error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Failed to change password',
         message: error.message
       });
@@ -407,12 +417,12 @@ router.delete(
       user.deletedAt = new Date();
       await user.save();
 
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Account deleted successfully'
       });
     } catch (error) {
       console.error('Delete account error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         error: 'Failed to delete account',
         message: error.message
       });
