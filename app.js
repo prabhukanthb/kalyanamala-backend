@@ -33,7 +33,8 @@ const corsOptions = {
   methods: ['GET','POST','PUT','DELETE','OPTIONS','PATCH'],
   allowedHeaders: ['Content-Type','Authorization']
 };
-
+const adminRoutes = require('./routes/admin');
+app.use('/api/admin', adminRoutes);
 app.use(helmet());
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
