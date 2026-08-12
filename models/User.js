@@ -6,7 +6,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true,
-      index: true
+      index: true,
+      default: null
     },
 
     email: {
@@ -42,6 +43,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true,'Lastnameisrequired'],
       trim: true
+    },
+
+    surname: {
+      type: String,
+      trim: true,
+      default: ''
     },
 
     password: {
