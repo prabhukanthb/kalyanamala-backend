@@ -2,31 +2,12 @@ const mongoose = require('mongoose');
 
 const photoSchema = new mongoose.Schema(
   {
-    url: {
-      type: String,
-      required: true
-    },
-    isPrimary: {
-      type: Boolean,
-      default: false
-    },
-    isApproved: {
-      type: Boolean,
-      default: false
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    },
-    approvedAt: {
-      type: Date,
-      default: null
-    },
-    approvedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null
-    }
+    url: { type: String, required: true },
+    isPrimary: { type: Boolean, default: false },
+    isApproved: { type: Boolean, default: false },
+    uploadedAt: { type: Date, default: Date.now },
+    approvedAt: { type: Date, default: null },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
   },
   { _id: false }
 );
@@ -46,12 +27,6 @@ const profileSchema = new mongoose.Schema(
       required: true,
       unique: true,
       index: true
-    },
-
-    roleOwner: {
-      type: String,
-      enum: ['user','subadmin','admin'],
-      default: 'user'
     },
 
     approvalStatus: {
@@ -77,14 +52,8 @@ const profileSchema = new mongoose.Schema(
       default: null
     },
 
-    // =========================
-    // REQUIRED PROFILE FIELDS
-    // =========================
-    fullName: {
-      type: String,
-      required: true,
-      trim: true
-    },
+    // BASIC DETAILS
+    fullName: { type: String, required: true, trim: true },
 
     gender: {
       type: String,
@@ -93,37 +62,33 @@ const profileSchema = new mongoose.Schema(
       index: true
     },
 
-    dateOfBirth: {
-      type: Date,
-      required: true
-    },
+    dateOfBirth: { type: Date, required: true },
 
-    heightCm: {
-      type: Number,
-      required: true
-    },
+    heightFeet: { type: Number, required: true },
+    heightInches: { type: Number, required: true },
 
-    heightFeet: {
+    // RELIGION & FAMILY
+    religion: {
       type: String,
-      default: null
+      enum: ['Christian','Hindu','Ambedkarist','Buddhist','Other'],
+      required: true
     },
 
     caste: {
       type: String,
       default: 'Mala',
-      required: true
+      immutable: true
     },
 
     subCaste: {
       type: String,
-      enum: ['SC','BC','OC','Other'],
+      enum: ['SC','BC','OC','NA'],
       required: true
     },
 
-    religion: {
-      type: String,
-      enum: ['Hindu','Christian','Ambedkar','Buddhist','NotApplicable'],
-      required: true
+    siblingsCount: {
+      type: Number,
+      default: 0
     },
 
     maritalStatus: {
@@ -132,40 +97,19 @@ const profileSchema = new mongoose.Schema(
       required: true
     },
 
-    education: {
-      type: String,
-      required: true
+    haveChildren: {
+      type: Boolean,
+      default: false
     },
 
-    fieldOfStudy: {
+    familyStatus: {
       type: String,
-      required: true
+      default: null
     },
 
-    employedIn: {
+    familyValues: {
       type: String,
-      enum: ['private','public','govt','business','self-employed','other'],
-      required: true
-    },
-
-    occupation: {
-      type: String,
-      required: true
-    },
-
-    jobTitle: {
-      type: String,
-      required: true
-    },
-
-    workLocation: {
-      type: String,
-      required: true
-    },
-
-    annualIncome: {
-      type: Number,
-      required: true
+      default: null
     },
 
     fatherName: {
@@ -188,38 +132,77 @@ const profileSchema = new mongoose.Schema(
       required: true
     },
 
-    siblingsCount: {
+    // PROFESSIONAL & EDUCATION
+    highestEducation: {
+      type: String,
+      required: true
+    },
+
+    fieldOfStudy: {
+      type: String,
+      required: true
+    },
+
+    college: {
+      type: String,
+      required: true
+    },
+
+    occupation: {
+      type: String,
+      required: true
+    },
+
+    employmentType: {
+      type: String,
+      enum: ['private','public','govt','business','self-employed','other'],
+      required: true
+    },
+
+    companyName: {
+      type: String,
+      required: true
+    },
+
+    jobTitle: {
+      type: String,
+      required: true
+    },
+
+    jobLocation: {
+      type: String,
+      required: true
+    },
+
+    industry: {
+      type: String,
+      required: true
+    },
+
+    income: {
       type: Number,
-      required: true,
-      default: 0
+      required: true
     },
 
+    incomeCurrency: {
+      type: String,
+      default: 'INR',
+      immutable: true
+    },
+
+    // CURRENT ADDRESS
     currentAddress: {
-      location: {
-        type: String,
-        required: true
-      },
-      city: {
-        type: String,
-        required: true
-      },
-      state: {
-        type: String,
-        required: true
-      },
-      country: {
-        type: String,
-        required: true
-      }
+      country: { type: String, required: true, default: 'India' },
+      state: { type: String, required: true },
+      city: { type: String, required: true }
     },
 
+    // ABOUT & PREFERENCE
     photos: {
       type: [photoSchema],
       default: [],
       validate: {
-        validator: function (arr) {
-          return arr.length <= 3;
-        },
+        validator: (arr) => arr.length <= 3,
         message: 'Maximum 3 photos allowed'
       }
     },
@@ -230,9 +213,12 @@ const profileSchema = new mongoose.Schema(
       maxlength: 2000
     },
 
-    // =========================
-    // MEMBERSHIP / VISIBILITY
-    // =========================
+    preferredMatch: {
+      type: String,
+      default: 'any_religion'
+    },
+
+    // VISIBILITY / MEMBERSHIP
     membershipType: {
       type: String,
       enum: ['free','premium'],
@@ -241,11 +227,6 @@ const profileSchema = new mongoose.Schema(
     },
 
     isPremium: {
-      type: Boolean,
-      default: false
-    },
-
-    isPublic: {
       type: Boolean,
       default: false
     },
@@ -266,14 +247,12 @@ const profileSchema = new mongoose.Schema(
       default: true
     },
 
-    hideWorkLocation: {
+    hideJobLocation: {
       type: Boolean,
       default: true
     },
 
-    // =========================
-    // ADMIN / MODERATION
-    // =========================
+    // SOFT DELETE
     isDeleted: {
       type: Boolean,
       default: false,
@@ -291,9 +270,7 @@ const profileSchema = new mongoose.Schema(
       default: null
     },
 
-    // =========================
-    // STATISTICS
-    // =========================
+    // STATS
     profileViews: {
       type: Number,
       default: 0
@@ -314,20 +291,12 @@ const profileSchema = new mongoose.Schema(
   }
 );
 
-// =========================
-// INDEXES
-// =========================
 profileSchema.index({ gender: 1, approvalStatus: 1, showInSearch: 1 });
-profileSchema.index({ caste: 1, subCaste: 1 });
 profileSchema.index({ religion: 1 });
 profileSchema.index({ membershipType: 1 });
-profileSchema.index({ profileId: 1 });
 profileSchema.index({ 'currentAddress.state': 1 });
 profileSchema.index({ 'currentAddress.city': 1 });
 
-// =========================
-// VIRTUALS
-// =========================
 profileSchema.virtual('age').get(function () {
   if (!this.dateOfBirth) return null;
   const diff = Date.now() - this.dateOfBirth.getTime();
@@ -338,35 +307,35 @@ profileSchema.virtual('primaryPhoto').get(function () {
   return this.photos.find((p) => p.isPrimary) || null;
 });
 
-// =========================
-// METHODS
-// =========================
 profileSchema.methods.calculateCompletion = function () {
   const requiredFields = [
     'fullName',
     'gender',
     'dateOfBirth',
-    'heightCm',
-    'caste',
-    'subCaste',
+    'heightFeet',
+    'heightInches',
     'religion',
+    'subCaste',
+    'siblingsCount',
     'maritalStatus',
-    'education',
-    'fieldOfStudy',
-    'employedIn',
-    'occupation',
-    'jobTitle',
-    'workLocation',
-    'annualIncome',
+    'haveChildren',
     'fatherName',
     'fatherOccupation',
     'motherName',
     'motherOccupation',
-    'siblingsCount',
-    'currentAddress.location',
-    'currentAddress.city',
-    'currentAddress.state',
+    'highestEducation',
+    'fieldOfStudy',
+    'college',
+    'occupation',
+    'employmentType',
+    'companyName',
+    'jobTitle',
+    'jobLocation',
+    'industry',
+    'income',
     'currentAddress.country',
+    'currentAddress.state',
+    'currentAddress.city',
     'aboutMe'
   ];
 
@@ -381,13 +350,9 @@ profileSchema.methods.calculateCompletion = function () {
   return this.profileCompletion;
 };
 
-// =========================
-// PRE SAVE
-// =========================
 profileSchema.pre('save', function (next) {
   this.calculateCompletion();
   next();
 });
 
-const Profile = mongoose.model('Profile', profileSchema);
-module.exports = Profile;
+module.exports = mongoose.model('Profile', profileSchema);
