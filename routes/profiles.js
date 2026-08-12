@@ -6,9 +6,9 @@ const { body, validationResult, param } = require('express-validator');
 const Profile = require('../models/Profile');
 const User = require('../models/User');
 
-// =========================
+// ==========================================
 // AUTH MIDDLEWARE
-// =========================
+// ==========================================
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization || '';
@@ -35,9 +35,9 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-// =========================
+// ==========================================
 // ROLE MIDDLEWARE
-// =========================
+// ==========================================
 const requireRole = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.userRole)) {
@@ -50,11 +50,10 @@ const requireRole = (...roles) => {
   };
 };
 
-// =========================
+// ==========================================
 // VALIDATION
-// =========================
+// ==========================================
 const profileValidation = [
-  body('fullName').trim().notEmpty().withMessage('Full name is required'),
   body('gender').isIn(['male','female']).withMessage('Gender must be male or female'),
   body('dateOfBirth').isISO8601().withMessage('Date of birth is required'),
   body('heightFeet').isNumeric().withMessage('Height feet is required'),
@@ -68,7 +67,10 @@ const profileValidation = [
     .isIn(['SC','BC','OC','NA'])
     .withMessage('Valid sub caste is required'),
 
-  body('siblingsCount').isNumeric().withMessage('Siblings count is required'),
+  body('siblingsCount')
+    .optional()
+    .isNumeric()
+    .withMessage('Siblings count must be numeric'),
 
   body('maritalStatus')
     .isIn(['Nevermarried','Divorced','Widowed','AwaitingDivorce'])
@@ -106,18 +108,18 @@ const profileValidation = [
   body('industry').notEmpty().withMessage('Industry is required'),
   body('income').isNumeric().withMessage('Income is required'),
 
-body('currentAddress.streetName').notEmpty().withMessage('Street name is required'),
-body('currentAddress.city').notEmpty().withMessage('City is required'),
-body('currentAddress.state').notEmpty().withMessage('State is required'),
-body('currentAddress.country').notEmpty().withMessage('Country is required'),
-body('currentAddress.pinCode').notEmpty().withMessage('Pin code is required'),
+  body('currentAddress.streetName').notEmpty().withMessage('Street name is required'),
+  body('currentAddress.city').notEmpty().withMessage('City is required'),
+  body('currentAddress.state').notEmpty().withMessage('State is required'),
+  body('currentAddress.country').notEmpty().withMessage('Country is required'),
+  body('currentAddress.pinCode').notEmpty().withMessage('Pin code is required'),
 
   body('aboutMe').notEmpty().withMessage('About me is required')
 ];
 
-// =========================
+// ==========================================
 // PROFILE ID GENERATOR
-// =========================
+// ==========================================
 function generateProfilePrefix(gender) {
   const now = new Date();
   const yy = String(now.getFullYear()).slice(-2);
@@ -126,9 +128,9 @@ function generateProfilePrefix(gender) {
   return `KM-${yy}${mm}${genderCode}`;
 }
 
-// =========================
+// ==========================================
 // CREATE PROFILE
-// =========================
+// ==========================================
 router.post('/', authMiddleware, profileValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -171,7 +173,6 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       profileId,
       userId: req.userId,
 
-      fullName: req.body.fullName,
       gender: req.body.gender,
       dateOfBirth: req.body.dateOfBirth,
       heightFeet: Number(req.body.heightFeet),
@@ -206,13 +207,14 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       income: Number(req.body.income),
       incomeCurrency: 'INR',
 
-  currentAddress: {
-  streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
-  city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
-  state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
-  country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
-  pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
-},
+      currentAddress: {
+        streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
+        city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
+        state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
+        country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
+        pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
+      },
+
       photos: Array.isArray(req.body.photos) ? req.body.photos.slice(0, 3) : [],
       aboutMe: req.body.aboutMe,
       preferredMatch: req.body.preferredMatch || 'any_religion',
@@ -235,13 +237,13 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
   }
 });
 
-// =========================
+// ==========================================
 // GET MY PROFILE
-// =========================
+// ==========================================
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const profile = await Profile.findOne({ userId: req.userId })
-      .populate('userId', 'email firstName lastName phone role status');
+      .populate('userId', 'email firstName lastName surname phone role status');
 
     if (!profile) {
       return res.status(404).json({
@@ -262,72 +264,72 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// =========================
+// ==========================================
 // UPDATE MY PROFILE
-// =========================
-router.put('/me', authMiddleware, async (req, res) => {
+// ==========================================
+router.put('/me', authMiddleware, profileValidation, async (req, res) => {
   try {
-    const profile = await Profile.findOne({ userId: req.userId });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array().map((e) => e.msg)
+      });
+    }
 
+    const profile = await Profile.findOne({ userId: req.userId });
     if (!profile) {
       return res.status(404).json({
         error: 'Profile not found'
       });
     }
 
-    const updatableFields = [
-      'fullName',
-      'gender',
-      'dateOfBirth',
-      'heightFeet',
-      'heightInches',
-      'religion',
-      'subCaste',
-      'siblingsCount',
-      'maritalStatus',
-      'haveChildren',
-      'familyStatus',
-      'familyValues',
-      'fatherName',
-      'fatherOccupation',
-      'motherName',
-      'motherOccupation',
-      'highestEducation',
-      'fieldOfStudy',
-      'college',
-      'occupation',
-      'employmentType',
-      'companyName',
-      'jobTitle',
-      'jobLocation',
-      'industry',
-      'income',
-      'currentAddress',
-      'aboutMe',
-      'preferredMatch'
-    ];
+    profile.gender = req.body.gender;
+    profile.dateOfBirth = req.body.dateOfBirth;
+    profile.heightFeet = Number(req.body.heightFeet);
+    profile.heightInches = Number(req.body.heightInches);
 
-    updatableFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        profile[field] = req.body[field];
-      }
-    });
-if (req.body.currentAddress !== undefined) {
-  profile.currentAddress = {
-    streetName: req.body.currentAddress.streetName || profile.currentAddress?.streetName,
-    city: req.body.currentAddress.city || profile.currentAddress?.city,
-    state: req.body.currentAddress.state || profile.currentAddress?.state,
-    country: req.body.currentAddress.country || profile.currentAddress?.country || 'India',
-    pinCode: req.body.currentAddress.pinCode || profile.currentAddress?.pinCode
-  };
-}
+    profile.religion = req.body.religion;
+    profile.caste = 'Mala';
+    profile.subCaste = req.body.subCaste;
+    profile.siblingsCount = Number(req.body.siblingsCount || 0);
+    profile.maritalStatus = req.body.maritalStatus;
+    profile.haveChildren = req.body.haveChildren === true || req.body.haveChildren === 'true';
+
+    profile.familyStatus = req.body.familyStatus || null;
+    profile.familyValues = req.body.familyValues || null;
+
+    profile.fatherName = req.body.fatherName;
+    profile.fatherOccupation = req.body.fatherOccupation;
+    profile.motherName = req.body.motherName;
+    profile.motherOccupation = req.body.motherOccupation;
+
+    profile.highestEducation = req.body.highestEducation;
+    profile.fieldOfStudy = req.body.fieldOfStudy;
+    profile.college = req.body.college;
+    profile.occupation = req.body.occupation;
+    profile.employmentType = req.body.employmentType;
+    profile.companyName = req.body.companyName;
+    profile.jobTitle = req.body.jobTitle;
+    profile.jobLocation = req.body.jobLocation;
+    profile.industry = req.body.industry;
+    profile.income = Number(req.body.income);
+    profile.incomeCurrency = 'INR';
+
+    profile.currentAddress = {
+      streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
+      city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
+      state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
+      country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
+      pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
+    };
+
+    profile.aboutMe = req.body.aboutMe;
+    profile.preferredMatch = req.body.preferredMatch || 'any_religion';
 
     if (req.body.photos !== undefined && Array.isArray(req.body.photos)) {
       profile.photos = req.body.photos.slice(0, 3);
     }
-
-    profile.caste = 'Mala';
-    profile.incomeCurrency = 'INR';
 
     await profile.save();
 
@@ -337,6 +339,7 @@ if (req.body.currentAddress !== undefined) {
       profile
     });
   } catch (error) {
+    console.error('Update profile error:', error);
     return res.status(500).json({
       error: 'Failed to update profile',
       message: error.message
@@ -344,13 +347,13 @@ if (req.body.currentAddress !== undefined) {
   }
 });
 
-// =========================
+// ==========================================
 // ADMIN / SUBADMIN: LIST ALL PROFILES
-// =========================
+// ==========================================
 router.get('/', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
   try {
     const profiles = await Profile.find()
-      .populate('userId', 'email firstName lastName phone role status')
+      .populate('userId', 'email firstName lastName surname phone role status')
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -366,13 +369,12 @@ router.get('/', authMiddleware, requireRole('admin', 'subadmin'), async (req, re
   }
 });
 
-// =========================
+// ==========================================
 // ADMIN / SUBADMIN: APPROVE PROFILE
-// =========================
+// ==========================================
 router.put('/:id/approve', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
   try {
     const profile = await Profile.findById(req.params.id);
-
     if (!profile) {
       return res.status(404).json({
         error: 'Profile not found'
@@ -399,15 +401,14 @@ router.put('/:id/approve', authMiddleware, requireRole('admin', 'subadmin'), asy
   }
 });
 
-// =========================
+// ==========================================
 // ADMIN / SUBADMIN: REJECT PROFILE
-// =========================
+// ==========================================
 router.put('/:id/reject', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
   try {
     const { rejectedReason } = req.body;
 
     const profile = await Profile.findById(req.params.id);
-
     if (!profile) {
       return res.status(404).json({
         error: 'Profile not found'
@@ -435,13 +436,12 @@ router.put('/:id/reject', authMiddleware, requireRole('admin', 'subadmin'), asyn
   }
 });
 
-// =========================
+// ==========================================
 // ADMIN / SUBADMIN: SOFT DELETE PROFILE
-// =========================
+// ==========================================
 router.delete('/:id', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
   try {
     const profile = await Profile.findById(req.params.id);
-
     if (!profile) {
       return res.status(404).json({
         error: 'Profile not found'
