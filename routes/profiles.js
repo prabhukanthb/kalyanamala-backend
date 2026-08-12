@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const { body, validationResult, param } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 
 const Profile = require('../models/Profile');
 const User = require('../models/User');
@@ -54,10 +54,21 @@ const requireRole = (...roles) => {
 // VALIDATION
 // ==========================================
 const profileValidation = [
-  body('gender').isIn(['male','female']).withMessage('Gender must be male or female'),
-  body('dateOfBirth').isISO8601().withMessage('Date of birth is required'),
-  body('heightFeet').isNumeric().withMessage('Height feet is required'),
-  body('heightInches').isNumeric().withMessage('Height inches is required'),
+  body('gender')
+    .isIn(['male','female'])
+    .withMessage('Gender must be male or female'),
+
+  body('dateOfBirth')
+    .isISO8601()
+    .withMessage('Date of birth is required'),
+
+  body('heightFeet')
+    .isNumeric()
+    .withMessage('Height feet is required'),
+
+  body('heightInches')
+    .isNumeric()
+    .withMessage('Height inches is required'),
 
   body('religion')
     .isIn(['Christian','Hindu','Ambedkarist','Buddhist','Other'])
@@ -76,45 +87,119 @@ const profileValidation = [
     .isIn(['Nevermarried','Divorced','Widowed','AwaitingDivorce'])
     .withMessage('Valid marital status is required'),
 
-  body('haveChildren').custom((value) => {
-    if (
-      value === true ||
-      value === false ||
-      value === 'true' ||
-      value === 'false'
-    ) {
-      return true;
-    }
-    throw new Error('Have Children must be true or false');
-  }),
+  body('haveChildren')
+    .custom((value) => {
+      if (
+        value === true ||
+        value === false ||
+        value === 'true' ||
+        value === 'false'
+      ) {
+        return true;
+      }
+      throw new Error('Have Children must be true or false');
+    }),
 
-  body('fatherName').notEmpty().withMessage('Father name is required'),
-  body('fatherOccupation').notEmpty().withMessage('Father occupation is required'),
-  body('motherName').notEmpty().withMessage('Mother name is required'),
-  body('motherOccupation').notEmpty().withMessage('Mother occupation is required'),
+  body('fatherName')
+    .notEmpty()
+    .withMessage('Father name is required'),
 
-  body('highestEducation').notEmpty().withMessage('Highest education is required'),
-  body('fieldOfStudy').notEmpty().withMessage('Field of study is required'),
-  body('college').notEmpty().withMessage('College is required'),
-  body('occupation').notEmpty().withMessage('Occupation is required'),
+  body('fatherOccupation')
+    .notEmpty()
+    .withMessage('Father occupation is required'),
+
+  body('motherName')
+    .notEmpty()
+    .withMessage('Mother name is required'),
+
+  body('motherOccupation')
+    .notEmpty()
+    .withMessage('Mother occupation is required'),
+
+  body('highestEducation')
+    .isIn([
+      '10th Pass',
+      '12th Pass',
+      'Diploma',
+      'ITI',
+      'B.A',
+      'B.Sc',
+      'B.Com',
+      'B.Tech',
+      'M.A',
+      'M.Sc',
+      'M.Com',
+      'M.Tech',
+      'MBA',
+      'MCA',
+      'MBBS',
+      'BDS',
+      'MD',
+      'MS',
+      'PhD',
+      'Other'
+    ])
+    .withMessage('Valid highest education is required'),
+
+  body('fieldOfStudy')
+    .notEmpty()
+    .withMessage('Field of study is required'),
+
+  body('college')
+    .notEmpty()
+    .withMessage('College is required'),
+
+  body('occupation')
+    .notEmpty()
+    .withMessage('Occupation is required'),
 
   body('employmentType')
     .isIn(['private','public','govt','business','self-employed','other'])
     .withMessage('Valid employment type is required'),
 
-  body('companyName').notEmpty().withMessage('Company name is required'),
-  body('jobTitle').notEmpty().withMessage('Job title is required'),
-  body('jobLocation').notEmpty().withMessage('Job location is required'),
-  body('industry').notEmpty().withMessage('Industry is required'),
-  body('income').isNumeric().withMessage('Income is required'),
+  body('companyName')
+    .notEmpty()
+    .withMessage('Company name is required'),
 
-  body('currentAddress.streetName').notEmpty().withMessage('Street name is required'),
-  body('currentAddress.city').notEmpty().withMessage('City is required'),
-  body('currentAddress.state').notEmpty().withMessage('State is required'),
-  body('currentAddress.country').notEmpty().withMessage('Country is required'),
-  body('currentAddress.pinCode').notEmpty().withMessage('Pin code is required'),
+  body('jobTitle')
+    .notEmpty()
+    .withMessage('Job title is required'),
 
-  body('aboutMe').notEmpty().withMessage('About me is required')
+  body('jobLocation')
+    .notEmpty()
+    .withMessage('Job location is required'),
+
+  body('industry')
+    .notEmpty()
+    .withMessage('Industry is required'),
+
+  body('income')
+    .isNumeric()
+    .withMessage('Income is required'),
+
+  body('currentAddress.streetName')
+    .notEmpty()
+    .withMessage('Street name is required'),
+
+  body('currentAddress.city')
+    .notEmpty()
+    .withMessage('City is required'),
+
+  body('currentAddress.state')
+    .notEmpty()
+    .withMessage('State is required'),
+
+  body('currentAddress.country')
+    .notEmpty()
+    .withMessage('Country is required'),
+
+  body('currentAddress.pinCode')
+    .notEmpty()
+    .withMessage('Pin code is required'),
+
+  body('aboutMe')
+    .notEmpty()
+    .withMessage('About me is required')
 ];
 
 // ==========================================
@@ -183,9 +268,7 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       subCaste: req.body.subCaste,
       siblingsCount: Number(req.body.siblingsCount || 0),
       maritalStatus: req.body.maritalStatus,
-      haveChildren:
-        req.body.haveChildren === true ||
-        req.body.haveChildren === 'true',
+      haveChildren: req.body.haveChildren === true || req.body.haveChildren === 'true',
 
       familyStatus: req.body.familyStatus || null,
       familyValues: req.body.familyValues || null,
