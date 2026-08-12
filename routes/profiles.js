@@ -106,9 +106,11 @@ const profileValidation = [
   body('industry').notEmpty().withMessage('Industry is required'),
   body('income').isNumeric().withMessage('Income is required'),
 
-  body('currentAddress.country').notEmpty().withMessage('Country is required'),
-  body('currentAddress.state').notEmpty().withMessage('State is required'),
-  body('currentAddress.city').notEmpty().withMessage('City is required'),
+body('currentAddress.streetName').notEmpty().withMessage('Street name is required'),
+body('currentAddress.city').notEmpty().withMessage('City is required'),
+body('currentAddress.state').notEmpty().withMessage('State is required'),
+body('currentAddress.country').notEmpty().withMessage('Country is required'),
+body('currentAddress.pinCode').notEmpty().withMessage('Pin code is required'),
 
   body('aboutMe').notEmpty().withMessage('About me is required')
 ];
@@ -204,12 +206,13 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       income: Number(req.body.income),
       incomeCurrency: 'INR',
 
-      currentAddress: {
-        country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
-        state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
-        city: req.body.currentAddress?.city || req.body['currentAddress[city]']
-      },
-
+  currentAddress: {
+  streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
+  city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
+  state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
+  country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
+  pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
+},
       photos: Array.isArray(req.body.photos) ? req.body.photos.slice(0, 3) : [],
       aboutMe: req.body.aboutMe,
       preferredMatch: req.body.preferredMatch || 'any_religion',
@@ -309,6 +312,15 @@ router.put('/me', authMiddleware, async (req, res) => {
         profile[field] = req.body[field];
       }
     });
+if (req.body.currentAddress !== undefined) {
+  profile.currentAddress = {
+    streetName: req.body.currentAddress.streetName || profile.currentAddress?.streetName,
+    city: req.body.currentAddress.city || profile.currentAddress?.city,
+    state: req.body.currentAddress.state || profile.currentAddress?.state,
+    country: req.body.currentAddress.country || profile.currentAddress?.country || 'India',
+    pinCode: req.body.currentAddress.pinCode || profile.currentAddress?.pinCode
+  };
+}
 
     if (req.body.photos !== undefined && Array.isArray(req.body.photos)) {
       profile.photos = req.body.photos.slice(0, 3);
