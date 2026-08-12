@@ -154,9 +154,31 @@ const profileSchema = new mongoose.Schema(
     // PROFESSIONAL & EDUCATION
     // =========================
     highestEducation: {
-      type: String,
-      required: true
-    },
+  type: String,
+  enum: [
+    '10th Pass',
+    '12th Pass',
+    'Diploma',
+    'ITI',
+    'B.A',
+    'B.Sc',
+    'B.Com',
+    'B.Tech',
+    'M.A',
+    'M.Sc',
+    'M.Com',
+    'M.Tech',
+    'MBA',
+    'MCA',
+    'MBBS',
+    'BDS',
+    'MD',
+    'MS',
+    'PhD',
+    'Other'
+  ],
+  required: true
+},
 
     fieldOfStudy: {
       type: String,
@@ -214,20 +236,28 @@ const profileSchema = new mongoose.Schema(
     // CURRENT ADDRESS
     // =========================
     currentAddress: {
-      country: {
-        type: String,
-        required: true,
-        default: 'India'
-      },
-      state: {
-        type: String,
-        required: true
-      },
-      city: {
-        type: String,
-        required: true
-      }
-    },
+  streetName: {
+    type: String,
+    required: true
+  },
+  city: {
+    type: String,
+    required: true
+  },
+  state: {
+    type: String,
+    required: true
+  },
+  country: {
+    type: String,
+    required: true,
+    default: 'India'
+  },
+  pinCode: {
+    type: String,
+    required: true
+  }
+},
 
     // =========================
     // ABOUT & PREFERENCE
