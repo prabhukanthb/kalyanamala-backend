@@ -55,12 +55,6 @@ const profileSchema = new mongoose.Schema(
     // =========================
     // BASIC DETAILS
     // =========================
-    fullName: {
-      type: String,
-      required: true,
-      trim: true
-    },
-
     gender: {
       type: String,
       enum: ['male','female'],
@@ -122,11 +116,13 @@ const profileSchema = new mongoose.Schema(
 
     familyStatus: {
       type: String,
+      enum: ['nuclear_family','joint_family','single_parent','extended_family'],
       default: null
     },
 
     familyValues: {
       type: String,
+      enum: ['orthodox','moderate','liberal'],
       default: null
     },
 
@@ -154,31 +150,31 @@ const profileSchema = new mongoose.Schema(
     // PROFESSIONAL & EDUCATION
     // =========================
     highestEducation: {
-  type: String,
-  enum: [
-    '10th Pass',
-    '12th Pass',
-    'Diploma',
-    'ITI',
-    'B.A',
-    'B.Sc',
-    'B.Com',
-    'B.Tech',
-    'M.A',
-    'M.Sc',
-    'M.Com',
-    'M.Tech',
-    'MBA',
-    'MCA',
-    'MBBS',
-    'BDS',
-    'MD',
-    'MS',
-    'PhD',
-    'Other'
-  ],
-  required: true
-},
+      type: String,
+      enum: [
+        '10th Pass',
+        '12th Pass',
+        'Diploma',
+        'ITI',
+        'B.A',
+        'B.Sc',
+        'B.Com',
+        'B.Tech',
+        'M.A',
+        'M.Sc',
+        'M.Com',
+        'M.Tech',
+        'MBA',
+        'MCA',
+        'MBBS',
+        'BDS',
+        'MD',
+        'MS',
+        'PhD',
+        'Other'
+      ],
+      required: true
+    },
 
     fieldOfStudy: {
       type: String,
@@ -236,28 +232,28 @@ const profileSchema = new mongoose.Schema(
     // CURRENT ADDRESS
     // =========================
     currentAddress: {
-  streetName: {
-    type: String,
-    required: true
-  },
-  city: {
-    type: String,
-    required: true
-  },
-  state: {
-    type: String,
-    required: true
-  },
-  country: {
-    type: String,
-    required: true,
-    default: 'India'
-  },
-  pinCode: {
-    type: String,
-    required: true
-  }
-},
+      streetName: {
+        type: String,
+        required: true
+      },
+      city: {
+        type: String,
+        required: true
+      },
+      state: {
+        type: String,
+        required: true
+      },
+      country: {
+        type: String,
+        required: true,
+        default: 'India'
+      },
+      pinCode: {
+        type: String,
+        required: true
+      }
+    },
 
     // =========================
     // ABOUT & PREFERENCE
@@ -369,6 +365,7 @@ profileSchema.index({ religion: 1 });
 profileSchema.index({ membershipType: 1 });
 profileSchema.index({ 'currentAddress.state': 1 });
 profileSchema.index({ 'currentAddress.city': 1 });
+profileSchema.index({ profileId: 1 });
 
 // =========================
 // VIRTUALS
@@ -388,7 +385,6 @@ profileSchema.virtual('primaryPhoto').get(function () {
 // =========================
 profileSchema.methods.calculateCompletion = function () {
   const requiredFields = [
-    'fullName',
     'gender',
     'dateOfBirth',
     'heightFeet',
@@ -412,9 +408,11 @@ profileSchema.methods.calculateCompletion = function () {
     'jobLocation',
     'industry',
     'income',
-    'currentAddress.country',
-    'currentAddress.state',
+    'currentAddress.streetName',
     'currentAddress.city',
+    'currentAddress.state',
+    'currentAddress.country',
+    'currentAddress.pinCode',
     'aboutMe'
   ];
 
