@@ -104,10 +104,10 @@ const profileSchema = new mongoose.Schema(
     },
 
     maritalStatus: {
-      type: String,
-      enum: ['Nevermarried','Divorced','Widowed','AwaitingDivorce'],
-      required: true
-    },
+  type: String,
+  enum: ['Never married', 'Divorced', 'Widowed', 'Awaiting Divorce'],
+  required: true
+},
 
     haveChildren: {
       type: Boolean,
