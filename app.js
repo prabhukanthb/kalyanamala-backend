@@ -7,6 +7,7 @@ const { globalErrorHandler, catchNotFound } = require('./middleware/errorHandler
 
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profiles');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -33,8 +34,7 @@ const corsOptions = {
   methods: ['GET','POST','PUT','DELETE','OPTIONS','PATCH'],
   allowedHeaders: ['Content-Type','Authorization']
 };
-const adminRoutes = require('./routes/admin');
-app.use('/api/admin', adminRoutes);
+
 app.use(helmet());
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
@@ -52,6 +52,7 @@ app.get('/api/version', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profiles', profileRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use(catchNotFound);
 app.use(globalErrorHandler);
