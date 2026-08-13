@@ -52,9 +52,7 @@ const profileSchema = new mongoose.Schema(
       default: null
     },
 
-    // =========================
     // BASIC DETAILS
-    // =========================
     gender: {
       type: String,
       enum: ['male','female'],
@@ -77,9 +75,7 @@ const profileSchema = new mongoose.Schema(
       required: true
     },
 
-    // =========================
     // RELIGION & FAMILY
-    // =========================
     religion: {
       type: String,
       enum: ['Christian','Hindu','Ambedkarist','Buddhist','Other'],
@@ -104,10 +100,10 @@ const profileSchema = new mongoose.Schema(
     },
 
     maritalStatus: {
-  type: String,
-  enum: ['Never married', 'Divorced', 'Widowed', 'Awaiting Divorce'],
-  required: true
-},
+      type: String,
+      enum: ['Nevermarried','Divorced','Widowed','AwaitingDivorce'],
+      required: true
+    },
 
     haveChildren: {
       type: Boolean,
@@ -146,9 +142,7 @@ const profileSchema = new mongoose.Schema(
       required: true
     },
 
-    // =========================
     // PROFESSIONAL & EDUCATION
-    // =========================
     highestEducation: {
       type: String,
       enum: [
@@ -228,9 +222,7 @@ const profileSchema = new mongoose.Schema(
       immutable: true
     },
 
-    // =========================
     // CURRENT ADDRESS
-    // =========================
     currentAddress: {
       streetName: {
         type: String,
@@ -255,9 +247,7 @@ const profileSchema = new mongoose.Schema(
       }
     },
 
-    // =========================
     // ABOUT & PREFERENCE
-    // =========================
     photos: {
       type: [photoSchema],
       default: [],
@@ -278,9 +268,7 @@ const profileSchema = new mongoose.Schema(
       default: 'any_religion'
     },
 
-    // =========================
     // VISIBILITY / MEMBERSHIP
-    // =========================
     membershipType: {
       type: String,
       enum: ['free','premium'],
@@ -314,9 +302,7 @@ const profileSchema = new mongoose.Schema(
       default: true
     },
 
-    // =========================
     // SOFT DELETE
-    // =========================
     isDeleted: {
       type: Boolean,
       default: false,
@@ -334,9 +320,7 @@ const profileSchema = new mongoose.Schema(
       default: null
     },
 
-    // =========================
     // STATS
-    // =========================
     profileViews: {
       type: Number,
       default: 0
@@ -357,9 +341,6 @@ const profileSchema = new mongoose.Schema(
   }
 );
 
-// =========================
-// INDEXES
-// =========================
 profileSchema.index({ gender: 1, approvalStatus: 1, showInSearch: 1 });
 profileSchema.index({ religion: 1 });
 profileSchema.index({ membershipType: 1 });
@@ -367,9 +348,6 @@ profileSchema.index({ 'currentAddress.state': 1 });
 profileSchema.index({ 'currentAddress.city': 1 });
 profileSchema.index({ profileId: 1 });
 
-// =========================
-// VIRTUALS
-// =========================
 profileSchema.virtual('age').get(function () {
   if (!this.dateOfBirth) return null;
   const diff = Date.now() - this.dateOfBirth.getTime();
@@ -380,9 +358,6 @@ profileSchema.virtual('primaryPhoto').get(function () {
   return this.photos.find((p) => p.isPrimary) || null;
 });
 
-// =========================
-// METHODS
-// =========================
 profileSchema.methods.calculateCompletion = function () {
   const requiredFields = [
     'gender',
@@ -427,9 +402,6 @@ profileSchema.methods.calculateCompletion = function () {
   return this.profileCompletion;
 };
 
-// =========================
-// PRE SAVE
-// =========================
 profileSchema.pre('save', function (next) {
   this.calculateCompletion();
   next();
