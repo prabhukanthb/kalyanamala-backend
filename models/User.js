@@ -2,11 +2,6 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
   {
-profileId: {
-  type: String,
-  default: null
-},
-
     email: {
       type: String,
       required: [true,'Emailisrequired'],
@@ -22,12 +17,6 @@ profileId: {
       unique: true,
       trim: true,
       index: true
-    },
-
-    alternativePhone: {
-      type: String,
-      trim: true,
-      default: null
     },
 
     firstName: {
@@ -46,6 +35,17 @@ profileId: {
       type: String,
       trim: true,
       default: ''
+    },
+
+    profileId: {
+      type: String,
+      default: null
+    },
+
+    alternativePhone: {
+      type: String,
+      trim: true,
+      default: null
     },
 
     password: {
@@ -96,11 +96,38 @@ profileId: {
     deletedAt: {
       type: Date,
       default: null
+    },
+
+    suspensionReason: {
+      type: String,
+      default: null
+    },
+
+    suspensionDuration: {
+      type: String,
+      default: null
+    },
+
+    suspendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+
+    suspendedAt: {
+      type: Date,
+      default: null
     }
   },
   {
     timestamps: true
   }
 );
+
+// Optional helpful indexes
+userSchema.index({ email: 1 });
+userSchema.index({ phone: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ status: 1 });
 
 module.exports = mongoose.model('User', userSchema);
