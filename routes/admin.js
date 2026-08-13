@@ -1,14 +1,8 @@
-// ==========================================
-// ADMIN ROUTES
-// New Kalyanamala Matrimony
-// ==========================================
-
 const express = require('express');
 const router = express.Router();
 const { body, validationResult, param, query } = require('express-validator');
 const jwt = require('jsonwebtoken');
 
-// Models
 const User = require('../models/User');
 const Profile = require('../models/Profile');
 
@@ -16,7 +10,6 @@ const Profile = require('../models/Profile');
 // MIDDLEWARE
 // ==========================================
 
-// Auth Middleware - Verify JWT Token
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization || '';
@@ -43,7 +36,6 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-// Admin Middleware - Verify Admin/Subadmin Role
 const adminMiddleware = (req, res, next) => {
   if (req.userRole !== 'admin' && req.userRole !== 'subadmin') {
     return res.status(403).json({
@@ -103,7 +95,6 @@ const reportValidation = [
 // DASHBOARD ROUTES
 // ==========================================
 
-// GET /api/admin/dashboard/stats
 router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -112,7 +103,6 @@ router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res)
     const pendingProfiles = await Profile.countDocuments({ approvalStatus: 'pending' });
     const rejectedProfiles = await Profile.countDocuments({ approvalStatus: 'rejected' });
     const deletedProfiles = await Profile.countDocuments({ approvalStatus: 'deleted' });
-
     const activeUsers = await User.countDocuments({ status: 'active' });
     const newUsersToday = await User.countDocuments({
       createdAt: {
@@ -120,7 +110,8 @@ router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res)
       }
     });
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: 'Dashboard statistics retrieved',
       stats: {
         totalUsers,
@@ -136,7 +127,7 @@ router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res)
     });
   } catch (error) {
     console.error('Dashboard stats error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Failed to fetch dashboard statistics',
       message: error.message
     });
@@ -147,7 +138,6 @@ router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res)
 // USER MANAGEMENT ROUTES
 // ==========================================
 
-// GET /api/admin/users
 router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -161,7 +151,6 @@ router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async
     const { role, status, limit = 20, page = 1, search } = req.query;
 
     let query = {};
-
     if (role) query.role = role;
     if (status) query.status = status;
 
@@ -186,7 +175,8 @@ router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async
 
     const total = await User.countDocuments(query);
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: 'Users retrieved successfully',
       pagination: {
         total,
@@ -211,14 +201,13 @@ router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async
     });
   } catch (error) {
     console.error('Get users error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Failed to fetch users',
       message: error.message
     });
   }
 });
 
-// GET /api/admin/users/:userId
 router.get('/users/:userId', authMiddleware, adminMiddleware, userActionValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -230,7 +219,6 @@ router.get('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
     }
 
     const { userId } = req.params;
-
     const user = await User.findById(userId).select('-password');
 
     if (!user) {
@@ -241,7 +229,8 @@ router.get('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
 
     const profile = await Profile.findOne({ userId }).lean();
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: 'User details retrieved',
       user: {
         id: user._id,
@@ -263,15 +252,14 @@ router.get('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
     });
   } catch (error) {
     console.error('Get user details error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       error: 'Failed to fetch user details',
       message: error.message
     });
   }
 });
 
-// PUT /api/admin/users/:userId
-// Admin/Subadmin can edit email, phone, name, surname, role, status
+// Edit user email/phone/name/surname/role/status
 router.put('/users/:userId', authMiddleware, adminMiddleware, userActionValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -318,14 +306,12 @@ router.put('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
   }
 });
 
-// POST /api/admin/users/:userId/make-admin
 router.post('/users/:userId/make-admin', authMiddleware, adminMiddleware, makeAdminValidation, async (req, res) => {
   try {
-    // Only admin can use this route; if you want only admin to promote others, keep this check
     if (req.userRole !== 'admin') {
       return res.status(403).json({
         error: 'Forbidden',
-        message: 'Only admin can promote users to admin/subadmin'
+        message: 'Only admin can promote users'
       });
     }
 
@@ -368,7 +354,6 @@ router.post('/users/:userId/make-admin', authMiddleware, adminMiddleware, makeAd
   }
 });
 
-// PUT /api/admin/users/:userId/suspend
 router.put('/users/:userId/suspend', authMiddleware, adminMiddleware, suspendUserValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -414,7 +399,6 @@ router.put('/users/:userId/suspend', authMiddleware, adminMiddleware, suspendUse
   }
 });
 
-// PUT /api/admin/users/:userId/unsuspend
 router.put('/users/:userId/unsuspend', authMiddleware, adminMiddleware, userActionValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -426,8 +410,8 @@ router.put('/users/:userId/unsuspend', authMiddleware, adminMiddleware, userActi
     }
 
     const { userId } = req.params;
-
     const user = await User.findById(userId);
+
     if (!user) {
       return res.status(404).json({
         error: 'User not found'
@@ -459,7 +443,6 @@ router.put('/users/:userId/unsuspend', authMiddleware, adminMiddleware, userActi
   }
 });
 
-// DELETE /api/admin/users/:userId
 router.delete('/users/:userId', authMiddleware, adminMiddleware, deleteUserValidation, async (req, res) => {
   try {
     if (req.userRole !== 'admin') {
@@ -525,7 +508,6 @@ router.delete('/users/:userId', authMiddleware, adminMiddleware, deleteUserValid
 // PROFILE MANAGEMENT ROUTES
 // ==========================================
 
-// GET /api/admin/profiles
 router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -539,11 +521,8 @@ router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, as
     const { status, limit = 20, page = 1, search } = req.query;
 
     let query = {};
-
     if (status) {
-      if (status === 'all') {
-        // no filter
-      } else {
+      if (status !== 'all') {
         query.approvalStatus = status;
       }
     }
@@ -570,6 +549,7 @@ router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, as
     const total = await Profile.countDocuments(query);
 
     return res.status(200).json({
+      success: true,
       message: 'Profiles retrieved successfully',
       pagination: {
         total,
@@ -577,22 +557,7 @@ router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, as
         limit: parseInt(limit, 10),
         pages: Math.ceil(total / limit)
       },
-      profiles: profiles.map(p => ({
-        id: p._id,
-        profileId: p.profileId,
-        fullName: p.fullName,
-        userName: `${p.userId?.firstName || ''} ${p.userId?.lastName || ''}`.trim(),
-        userEmail: p.userId?.email,
-        userPhone: p.userId?.phone,
-        gender: p.gender,
-        religion: p.religion,
-        caste: p.caste,
-        subCaste: p.subCaste,
-        city: p.currentAddress?.city,
-        state: p.currentAddress?.state,
-        approvalStatus: p.approvalStatus,
-        createdAt: p.createdAt
-      }))
+      profiles
     });
   } catch (error) {
     console.error('Get profiles error:', error);
@@ -603,7 +568,6 @@ router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, as
   }
 });
 
-// PUT /api/admin/profiles/:profileId/status
 router.put('/profiles/:profileId/status', authMiddleware, adminMiddleware, profileStatusValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -661,6 +625,7 @@ router.put('/profiles/:profileId/status', authMiddleware, adminMiddleware, profi
 router.get('/reports', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     return res.status(200).json({
+      success: true,
       message: 'Reports retrieved successfully',
       note: 'Report model needs to be created first'
     });
@@ -705,7 +670,6 @@ router.put('/reports/:reportId', authMiddleware, adminMiddleware, reportValidati
 // SYSTEM MANAGEMENT ROUTES
 // ==========================================
 
-// POST /api/admin/system/backup
 router.post('/system/backup', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     if (req.userRole !== 'admin') {
@@ -716,6 +680,7 @@ router.post('/system/backup', authMiddleware, adminMiddleware, async (req, res) 
     }
 
     return res.status(200).json({
+      success: true,
       message: 'Database backup initiated',
       timestamp: new Date(),
       backupId: `backup_${Date.now()}`
@@ -729,12 +694,12 @@ router.post('/system/backup', authMiddleware, adminMiddleware, async (req, res) 
   }
 });
 
-// GET /api/admin/system/logs
 router.get('/system/logs', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { limit = 100, page = 1, type } = req.query;
 
     return res.status(200).json({
+      success: true,
       message: 'System logs retrieved',
       note: 'Logging system needs to be configured',
       limit,
@@ -750,10 +715,10 @@ router.get('/system/logs', authMiddleware, adminMiddleware, async (req, res) => 
   }
 });
 
-// GET /api/admin/audit-trail
 router.get('/audit-trail', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     return res.status(200).json({
+      success: true,
       message: 'Audit trail retrieved',
       note: 'AuditLog model needs to be created first'
     });
@@ -765,36 +730,5 @@ router.get('/audit-trail', authMiddleware, adminMiddleware, async (req, res) => 
     });
   }
 });
-
-// ==========================================
-// HELPER FUNCTIONS
-// ==========================================
-
-function calculateSuspensionEndDate(duration) {
-  const now = new Date();
-  const match = duration.match(/^(\d+)([dmh])$/);
-
-  if (!match) {
-    return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  }
-
-  const amount = parseInt(match[1], 10);
-  const unit = match[2];
-
-  switch (unit) {
-    case 'd':
-      return new Date(now.getTime() + amount * 24 * 60 * 60 * 1000);
-    case 'h':
-      return new Date(now.getTime() + amount * 60 * 60 * 1000);
-    case 'm':
-      return new Date(now.getTime() + amount * 60 * 1000);
-    default:
-      return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  }
-}
-
-// ==========================================
-// EXPORT ROUTER
-// ==========================================
 
 module.exports = router;
