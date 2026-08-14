@@ -84,8 +84,8 @@ const profileValidation = [
     .withMessage('Siblings count must be numeric'),
 
   body('maritalStatus')
-    .isIn(['Nevermarried','Divorced','Widowed','AwaitingDivorce'])
-    .withMessage('Valid marital status is required'),
+  .isIn(['Never married', 'Divorced', 'Widowed', 'Awaiting Divorce'])
+  .withMessage('Valid marital status is required'),
 
   body('haveChildren')
     .custom((value) => {
