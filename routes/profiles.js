@@ -241,19 +241,18 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       });
     }
 
-    const prefix = generateProfilePrefix(req.body.gender);
+const prefix = generateProfilePrefix(req.body.gender);
 
-    const lastProfile = await Profile.findOne({
-      profileId: new RegExp(`^${prefix}`)
-    }).sort({ profileId: -1 });
+const lastProfile = await Profile.findOne({ profileId: new RegExp(`^${prefix}`) })
+  .sort({ createdAt: -1 });
 
-    let sequence = 1;
-    if (lastProfile?.profileId) {
-      sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
-    }
+let sequence = 1;
+if (lastProfile?.profileId) {
+  sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
+}
 
-    const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
-
+const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
+    
     const profile = await Profile.create({
       profileId,
       userId: req.userId,
