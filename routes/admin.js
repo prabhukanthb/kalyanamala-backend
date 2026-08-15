@@ -57,12 +57,11 @@ const profileIdValidation = [
 ];
 
 const listProfilesValidation = [
-  query('search').optional().trim().notEmpty().withMessage('Search cannot be empty'),
-  query('status').optional().isIn(['all','draft','pending','approved','rejected','deleted']).withMessage('Invalid status'),
+  query('search').optional().trim(),
+  query('status').optional().isIn(['all', 'draft', 'pending', 'approved', 'rejected', 'deleted']).withMessage('Invalid status'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100'),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be positive number')
 ];
-
 const listUsersValidation = [
   query('role').optional().isIn(['user','subadmin','admin']).withMessage('Invalid role'),
   query('status').optional().isIn(['active','inactive','suspended','deleted']).withMessage('Invalid status'),
