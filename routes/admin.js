@@ -7,9 +7,8 @@ const User = require('../models/User');
 const Profile = require('../models/Profile');
 
 // ==========================================
-// MIDDLEWARE
+// AUTH MIDDLEWARE
 // ==========================================
-
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization || '';
@@ -47,8 +46,22 @@ const adminMiddleware = (req, res, next) => {
 };
 
 // ==========================================
-// VALIDATION RULES
+// VALIDATION
 // ==========================================
+const userIdValidation = [
+  param('userId').isMongoId().withMessage('Invalid user ID')
+];
+
+const profileIdValidation = [
+  param('profileId').isMongoId().withMessage('Invalid profile ID')
+];
+
+const listProfilesValidation = [
+  query('search').optional().trim().notEmpty().withMessage('Search cannot be empty'),
+  query('status').optional().isIn(['all','draft','pending','approved','rejected','deleted']).withMessage('Invalid status'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100'),
+  query('page').optional().isInt({ min: 1 }).withMessage('Page must be positive number')
+];
 
 const listUsersValidation = [
   query('role').optional().isIn(['user','subadmin','admin']).withMessage('Invalid role'),
@@ -58,43 +71,167 @@ const listUsersValidation = [
   query('search').optional().trim().notEmpty().withMessage('Search term cannot be empty')
 ];
 
-const userActionValidation = [
-  param('userId').isMongoId().withMessage('Invalid user ID')
-];
+const profileValidation = [
+  body('gender').isIn(['male','female']).withMessage('Gender must be male or female'),
+  body('dateOfBirth').isISO8601().withMessage('Date of birth is required'),
+  body('heightFeet').isNumeric().withMessage('Height feet is required'),
+  body('heightInches').isNumeric().withMessage('Height inches is required'),
 
-const makeAdminValidation = [
-  param('userId').isMongoId().withMessage('Invalid user ID'),
-  body('adminLevel').isIn(['admin','subadmin']).withMessage('Invalid admin level')
-];
+  body('religion')
+    .isIn(['Christian','Hindu','Ambedkarist','Buddhist','Other'])
+    .withMessage('Valid religion is required'),
 
-const suspendUserValidation = [
-  param('userId').isMongoId().withMessage('Invalid user ID'),
-  body('reason').trim().notEmpty().isLength({ min: 10 }).withMessage('Reason must be at least 10 characters'),
-  body('duration').optional().matches(/^[0-9]+[dmh]$/).withMessage('Duration format: e.g., 30d, 24h, 10m')
-];
+  body('subCaste')
+    .isIn(['SC','BC','OC','NA'])
+    .withMessage('Valid sub caste is required'),
 
-const deleteUserValidation = [
-  param('userId').isMongoId().withMessage('Invalid user ID'),
-  body('reason').trim().notEmpty().withMessage('Reason for deletion is required'),
-  body('permanent').optional().isBoolean().withMessage('Must be boolean')
-];
+  body('siblingsCount').optional().isNumeric().withMessage('Siblings count must be numeric'),
 
-const profileStatusValidation = [
-  param('profileId').isMongoId().withMessage('Invalid profile ID'),
-  body('status').isIn(['active','suspended','deleted']).withMessage('Invalid status'),
-  body('reason').optional().trim().notEmpty().withMessage('Reason is required')
-];
+  body('maritalStatus')
+    .isIn(['Nevermarried','Divorced','Widowed','AwaitingDivorce'])
+    .withMessage('Valid marital status is required'),
 
-const reportValidation = [
-  param('reportId').isMongoId().withMessage('Invalid report ID'),
-  body('action').isIn(['approve','reject','pending']).withMessage('Invalid action'),
-  body('notes').optional().trim().isLength({ max: 500 }).withMessage('Notes max 500 characters')
+  body('haveChildren').custom((value) => {
+    if (
+      value === true ||
+      value === false ||
+      value === 'true' ||
+      value === 'false'
+    ) {
+      return true;
+    }
+    throw new Error('Have Children must be true or false');
+  }),
+
+  body('fatherName').notEmpty().withMessage('Father name is required'),
+  body('fatherOccupation').notEmpty().withMessage('Father occupation is required'),
+  body('motherName').notEmpty().withMessage('Mother name is required'),
+  body('motherOccupation').notEmpty().withMessage('Mother occupation is required'),
+
+  body('highestEducation')
+    .isIn([
+      '10th Pass',
+      '12th Pass',
+      'Diploma',
+      'ITI',
+      'B.A',
+      'B.Sc',
+      'B.Com',
+      'B.Tech',
+      'M.A',
+      'M.Sc',
+      'M.Com',
+      'M.Tech',
+      'MBA',
+      'MCA',
+      'MBBS',
+      'BDS',
+      'MD',
+      'MS',
+      'PhD',
+      'Other'
+    ])
+    .withMessage('Valid highest education is required'),
+
+  body('fieldOfStudy').notEmpty().withMessage('Field of study is required'),
+  body('college').notEmpty().withMessage('College is required'),
+  body('occupation').notEmpty().withMessage('Occupation is required'),
+
+  body('employmentType')
+    .isIn(['private','public','govt','business','self-employed','other'])
+    .withMessage('Valid employment type is required'),
+
+  body('companyName').notEmpty().withMessage('Company name is required'),
+  body('jobTitle').notEmpty().withMessage('Job title is required'),
+  body('jobLocation').notEmpty().withMessage('Job location is required'),
+  body('industry').notEmpty().withMessage('Industry is required'),
+
+  body('income').isNumeric().withMessage('Income is required'),
+
+  body('currentAddress.streetName').notEmpty().withMessage('Street name is required'),
+  body('currentAddress.city').notEmpty().withMessage('City is required'),
+  body('currentAddress.state').notEmpty().withMessage('State is required'),
+  body('currentAddress.country').notEmpty().withMessage('Country is required'),
+  body('currentAddress.pinCode').notEmpty().withMessage('Pin code is required'),
+
+  body('aboutMe').notEmpty().withMessage('About me is required')
 ];
 
 // ==========================================
-// DASHBOARD ROUTES
+// HELPERS
 // ==========================================
+function generateProfilePrefix(gender) {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const genderCode = gender === 'male' ? 'M' : 'F';
+  return `KM-${yy}${mm}${genderCode}`;
+}
 
+function buildProfilePayload(bodyData, reqUserId, isAdminCreate = false) {
+  const profilePayload = {
+    gender: bodyData.gender,
+    dateOfBirth: bodyData.dateOfBirth,
+    heightFeet: Number(bodyData.heightFeet),
+    heightInches: Number(bodyData.heightInches),
+
+    religion: bodyData.religion,
+    caste: 'Mala',
+    subCaste: bodyData.subCaste,
+    siblingsCount: Number(bodyData.siblingsCount || 0),
+    maritalStatus: bodyData.maritalStatus,
+    haveChildren: bodyData.haveChildren === true || bodyData.haveChildren === 'true',
+
+    familyStatus: bodyData.familyStatus || null,
+    familyValues: bodyData.familyValues || null,
+
+    fatherName: bodyData.fatherName,
+    fatherOccupation: bodyData.fatherOccupation,
+    motherName: bodyData.motherName,
+    motherOccupation: bodyData.motherOccupation,
+
+    highestEducation: bodyData.highestEducation,
+    fieldOfStudy: bodyData.fieldOfStudy,
+    college: bodyData.college,
+    occupation: bodyData.occupation,
+    employmentType: bodyData.employmentType,
+    companyName: bodyData.companyName,
+    jobTitle: bodyData.jobTitle,
+    jobLocation: bodyData.jobLocation,
+    industry: bodyData.industry,
+    income: Number(bodyData.income),
+    incomeCurrency: 'INR',
+
+    currentAddress: {
+      streetName: bodyData.currentAddress?.streetName,
+      city: bodyData.currentAddress?.city,
+      state: bodyData.currentAddress?.state,
+      country: bodyData.currentAddress?.country || 'India',
+      pinCode: bodyData.currentAddress?.pinCode
+    },
+
+    photos: Array.isArray(bodyData.photos) ? bodyData.photos.slice(0, 3) : [],
+    aboutMe: bodyData.aboutMe,
+    preferredMatch: bodyData.preferredMatch || 'any_religion',
+
+    membershipType: bodyData.membershipType || 'free',
+    isPremium: bodyData.isPremium === true || bodyData.isPremium === 'true',
+    hideMobile: bodyData.hideMobile === true || bodyData.hideMobile === 'true' || true,
+    hideCurrentAddress: bodyData.hideCurrentAddress === true || bodyData.hideCurrentAddress === 'true' || true,
+    hideJobLocation: bodyData.hideJobLocation === true || bodyData.hideJobLocation === 'true' || true,
+
+    showInSearch: isAdminCreate ? true : false,
+    approvalStatus: isAdminCreate ? 'approved' : 'pending',
+    approvedBy: isAdminCreate ? reqUserId : null,
+    approvedAt: isAdminCreate ? new Date() : null
+  };
+
+  return profilePayload;
+}
+
+// ==========================================
+// DASHBOARD STATS
+// ==========================================
 router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
@@ -105,9 +242,7 @@ router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res)
     const deletedProfiles = await Profile.countDocuments({ approvalStatus: 'deleted' });
     const activeUsers = await User.countDocuments({ status: 'active' });
     const newUsersToday = await User.countDocuments({
-      createdAt: {
-        $gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
-      }
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
     });
 
     return res.status(200).json({
@@ -135,9 +270,8 @@ router.get('/dashboard/stats', authMiddleware, adminMiddleware, async (req, res)
 });
 
 // ==========================================
-// USER MANAGEMENT ROUTES
+// USERS
 // ==========================================
-
 router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -149,6 +283,7 @@ router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async
     }
 
     const { role, status, limit = 20, page = 1, search } = req.query;
+    const skip = (page - 1) * limit;
 
     let query = {};
     if (role) query.role = role;
@@ -163,8 +298,6 @@ router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async
         { phone: { $regex: search, $options: 'i' } }
       ];
     }
-
-    const skip = (page - 1) * limit;
 
     const users = await User.find(query)
       .select('-password')
@@ -195,8 +328,7 @@ router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async
         status: u.status,
         isActive: u.isActive,
         createdAt: u.createdAt,
-        updatedAt: u.updatedAt,
-        lastLoginAt: u.lastLoginAt
+        updatedAt: u.updatedAt
       }))
     });
   } catch (error) {
@@ -208,7 +340,7 @@ router.get('/users', authMiddleware, adminMiddleware, listUsersValidation, async
   }
 });
 
-router.get('/users/:userId', authMiddleware, adminMiddleware, userActionValidation, async (req, res) => {
+router.get('/users/:userId', authMiddleware, adminMiddleware, userIdValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -218,35 +350,18 @@ router.get('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
       });
     }
 
-    const { userId } = req.params;
-    const user = await User.findById(userId).select('-password');
-
+    const user = await User.findById(req.params.userId).select('-password');
     if (!user) {
-      return res.status(404).json({
-        error: 'User not found'
-      });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    const profile = await Profile.findOne({ userId }).lean();
+    const profile = await Profile.findOne({ userId: req.params.userId }).lean();
 
     return res.status(200).json({
       success: true,
       message: 'User details retrieved',
       user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        surname: user.surname,
-        phone: user.phone,
-        role: user.role,
-        status: user.status,
-        isActive: user.isActive,
-        emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified,
-        lastLoginAt: user.lastLoginAt,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
+        ...user.toObject?.() || user,
         profile: profile || null
       }
     });
@@ -259,8 +374,7 @@ router.get('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
   }
 });
 
-// Edit user email/phone/name/surname/role/status
-router.put('/users/:userId', authMiddleware, adminMiddleware, userActionValidation, async (req, res) => {
+router.put('/users/:userId', authMiddleware, adminMiddleware, userIdValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -270,14 +384,11 @@ router.put('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
       });
     }
 
-    const { userId } = req.params;
     const { email, phone, firstName, lastName, surname, role, status } = req.body;
 
-    const user = await User.findById(userId);
+    const user = await User.findById(req.params.userId);
     if (!user) {
-      return res.status(404).json({
-        error: 'User not found'
-      });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     if (email !== undefined) user.email = email;
@@ -290,12 +401,10 @@ router.put('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
 
     await user.save();
 
-    const updatedUser = await User.findById(userId).select('-password');
-
     return res.status(200).json({
       success: true,
       message: 'User updated successfully',
-      user: updatedUser
+      user: await User.findById(req.params.userId).select('-password')
     });
   } catch (error) {
     console.error('Update user error:', error);
@@ -306,209 +415,10 @@ router.put('/users/:userId', authMiddleware, adminMiddleware, userActionValidati
   }
 });
 
-router.post('/users/:userId/make-admin', authMiddleware, adminMiddleware, makeAdminValidation, async (req, res) => {
-  try {
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Only admin can promote users'
-      });
-    }
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array().map(e => e.msg)
-      });
-    }
-
-    const { userId } = req.params;
-    const { adminLevel } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found'
-      });
-    }
-
-    user.role = adminLevel;
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: `User promoted to ${adminLevel} successfully`,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role
-      }
-    });
-  } catch (error) {
-    console.error('Make admin error:', error);
-    return res.status(500).json({
-      error: 'Failed to promote user to admin',
-      message: error.message
-    });
-  }
-});
-
-router.put('/users/:userId/suspend', authMiddleware, adminMiddleware, suspendUserValidation, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array().map(e => e.msg)
-      });
-    }
-
-    const { userId } = req.params;
-    const { reason, duration = '30d' } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found'
-      });
-    }
-
-    user.status = 'suspended';
-    user.suspensionReason = reason;
-    user.suspensionDuration = duration;
-    user.suspendedBy = req.userId;
-    user.suspendedAt = new Date();
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'User suspended successfully',
-      user: {
-        id: user._id,
-        email: user.email,
-        status: user.status
-      }
-    });
-  } catch (error) {
-    console.error('Suspend user error:', error);
-    return res.status(500).json({
-      error: 'Failed to suspend user',
-      message: error.message
-    });
-  }
-});
-
-router.put('/users/:userId/unsuspend', authMiddleware, adminMiddleware, userActionValidation, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array().map(e => e.msg)
-      });
-    }
-
-    const { userId } = req.params;
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found'
-      });
-    }
-
-    user.status = 'active';
-    user.suspensionReason = null;
-    user.suspensionDuration = null;
-    user.suspendedBy = null;
-    user.suspendedAt = null;
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: 'User unsuspended successfully',
-      user: {
-        id: user._id,
-        email: user.email,
-        status: user.status
-      }
-    });
-  } catch (error) {
-    console.error('Unsuspend user error:', error);
-    return res.status(500).json({
-      error: 'Failed to unsuspend user',
-      message: error.message
-    });
-  }
-});
-
-router.delete('/users/:userId', authMiddleware, adminMiddleware, deleteUserValidation, async (req, res) => {
-  try {
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Only admin can delete user accounts'
-      });
-    }
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array().map(e => e.msg)
-      });
-    }
-
-    const { userId } = req.params;
-    const { permanent = false } = req.body;
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found'
-      });
-    }
-
-    if (permanent) {
-      await User.findByIdAndDelete(userId);
-      await Profile.deleteOne({ userId });
-    } else {
-      user.status = 'deleted';
-      user.deletedAt = new Date();
-      user.isActive = false;
-      await user.save();
-
-      const profile = await Profile.findOne({ userId });
-      if (profile) {
-        profile.isDeleted = true;
-        profile.deletedAt = new Date();
-        profile.approvalStatus = 'deleted';
-        profile.showInSearch = false;
-        await profile.save();
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'User deleted successfully',
-      permanent,
-      userId
-    });
-  } catch (error) {
-    console.error('Delete user error:', error);
-    return res.status(500).json({
-      error: 'Failed to delete user',
-      message: error.message
-    });
-  }
-});
-
 // ==========================================
-// PROFILE MANAGEMENT ROUTES
+// PROFILES LIST / SEARCH
 // ==========================================
-
-router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, async (req, res) => {
+router.get('/profiles', authMiddleware, adminMiddleware, listProfilesValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -518,18 +428,23 @@ router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, as
       });
     }
 
-    const { status, limit = 20, page = 1, search } = req.query;
+    const { search, status = 'all', limit = 20, page = 1 } = req.query;
+    const skip = (page - 1) * limit;
 
     let query = {};
-    if (status) {
-      if (status !== 'all') {
-        query.approvalStatus = status;
-      }
+
+    if (status && status !== 'all') {
+      query.approvalStatus = status;
     }
 
     if (search) {
       query.$or = [
-        { fullName: { $regex: search, $options: 'i' } },
+        { profileId: { $regex: search, $options: 'i' } },
+        { 'userId.firstName': { $regex: search, $options: 'i' } },
+        { 'userId.lastName': { $regex: search, $options: 'i' } },
+        { 'userId.surname': { $regex: search, $options: 'i' } },
+        { 'userId.email': { $regex: search, $options: 'i' } },
+        { 'userId.phone': { $regex: search, $options: 'i' } },
         { religion: { $regex: search, $options: 'i' } },
         { occupation: { $regex: search, $options: 'i' } },
         { 'currentAddress.city': { $regex: search, $options: 'i' } },
@@ -537,13 +452,11 @@ router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, as
       ];
     }
 
-    const skip = (page - 1) * limit;
-
     const profiles = await Profile.find(query)
       .populate('userId', 'firstName lastName surname email phone role status')
-      .limit(parseInt(limit, 10))
-      .skip(skip)
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit, 10))
       .lean();
 
     const total = await Profile.countDocuments(query);
@@ -568,7 +481,10 @@ router.get('/profiles', authMiddleware, adminMiddleware, listUsersValidation, as
   }
 });
 
-router.put('/profiles/:profileId/status', authMiddleware, adminMiddleware, profileStatusValidation, async (req, res) => {
+// ==========================================
+// PROFILE FULL VIEW
+// ==========================================
+router.get('/profiles/:profileId', authMiddleware, adminMiddleware, profileIdValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -578,154 +494,221 @@ router.put('/profiles/:profileId/status', authMiddleware, adminMiddleware, profi
       });
     }
 
-    const { profileId } = req.params;
-    const { status, reason } = req.body;
+    const profile = await Profile.findById(req.params.profileId)
+      .populate('userId', 'firstName lastName surname email phone role status');
 
-    const profile = await Profile.findById(profileId);
     if (!profile) {
-      return res.status(404).json({
-        error: 'Profile not found'
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      profile
+    });
+  } catch (error) {
+    console.error('Get profile details error:', error);
+    return res.status(500).json({
+      error: 'Failed to fetch profile',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN CREATE PROFILE - AUTO APPROVE
+// ==========================================
+router.post('/profiles', authMiddleware, adminMiddleware, profileValidation, async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array().map(e => e.msg)
       });
     }
 
-    profile.approvalStatus = status;
-    profile.rejectedReason = reason || null;
-    profile.showInSearch = status === 'active' || status === 'approved';
+    const userId = req.body.userId || null;
 
-    if (status === 'deleted') {
-      profile.isDeleted = true;
-      profile.deletedAt = new Date();
-      profile.showInSearch = false;
+    if (userId) {
+      const userExists = await User.findById(userId);
+      if (!userExists) {
+        return res.status(404).json({ error: 'Linked user not found' });
+      }
+
+      const existingProfile = await Profile.findOne({ userId });
+      if (existingProfile) {
+        return res.status(400).json({
+          error: 'Profile already exists for this user'
+        });
+      }
+    }
+
+    const prefix = generateProfilePrefix(req.body.gender);
+    const lastProfile = await Profile.findOne({
+      profileId: new RegExp(`^${prefix}`)
+    }).sort({ profileId: -1 });
+
+    let sequence = 1;
+    if (lastProfile?.profileId) {
+      sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
+    }
+
+    const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
+
+    const profileData = buildProfilePayload(req.body, req.userId, true);
+
+    const profile = await Profile.create({
+      profileId,
+      userId: userId || req.userId,
+      ...profileData
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Profile created successfully and auto-approved',
+      profile
+    });
+  } catch (error) {
+    console.error('Admin create profile error:', error);
+    return res.status(500).json({
+      error: 'Failed to create profile',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN EDIT FULL PROFILE
+// ==========================================
+router.put('/profiles/:profileId', authMiddleware, adminMiddleware, profileIdValidation, profileValidation, async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array().map(e => e.msg)
+      });
+    }
+
+    const profile = await Profile.findById(req.params.profileId);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const updated = buildProfilePayload(req.body, req.userId, false);
+
+    Object.assign(profile, updated);
+
+    // preserve approval unless admin explicitly changes it elsewhere
+    if (req.body.approvalStatus) {
+      profile.approvalStatus = req.body.approvalStatus;
+    }
+
+    if (req.body.showInSearch !== undefined) {
+      profile.showInSearch = req.body.showInSearch === true || req.body.showInSearch === 'true';
     }
 
     await profile.save();
 
     return res.status(200).json({
       success: true,
-      message: 'Profile status updated successfully',
-      profile: {
-        id: profile._id,
-        profileId: profile.profileId,
-        approvalStatus: profile.approvalStatus
-      }
+      message: 'Profile updated successfully',
+      profile
     });
   } catch (error) {
-    console.error('Update profile status error:', error);
+    console.error('Admin update profile error:', error);
     return res.status(500).json({
-      error: 'Failed to update profile status',
+      error: 'Failed to update profile',
       message: error.message
     });
   }
 });
 
 // ==========================================
-// REPORT MANAGEMENT ROUTES
+// APPROVE / REJECT / DELETE PROFILE
 // ==========================================
-
-router.get('/reports', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/profiles/:profileId/approve', authMiddleware, adminMiddleware, profileIdValidation, async (req, res) => {
   try {
-    return res.status(200).json({
-      success: true,
-      message: 'Reports retrieved successfully',
-      note: 'Report model needs to be created first'
-    });
-  } catch (error) {
-    console.error('Get reports error:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch reports',
-      message: error.message
-    });
-  }
-});
-
-router.put('/reports/:reportId', authMiddleware, adminMiddleware, reportValidation, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        details: errors.array().map(e => e.msg)
-      });
+    const profile = await Profile.findById(req.params.profileId);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
-    const { reportId } = req.params;
-    const { action } = req.body;
+    profile.approvalStatus = 'approved';
+    profile.approvedBy = req.userId;
+    profile.approvedAt = new Date();
+    profile.showInSearch = true;
+
+    await profile.save();
 
     return res.status(200).json({
       success: true,
-      message: 'Report updated successfully',
-      reportId,
-      action
+      message: 'Profile approved successfully',
+      profile
     });
   } catch (error) {
-    console.error('Update report error:', error);
+    console.error('Approve profile error:', error);
     return res.status(500).json({
-      error: 'Failed to update report',
+      error: 'Failed to approve profile',
       message: error.message
     });
   }
 });
 
-// ==========================================
-// SYSTEM MANAGEMENT ROUTES
-// ==========================================
-
-router.post('/system/backup', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/profiles/:profileId/reject', authMiddleware, adminMiddleware, profileIdValidation, async (req, res) => {
   try {
-    if (req.userRole !== 'admin') {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: 'Only admin can create backups'
-      });
+    const { rejectedReason } = req.body;
+
+    const profile = await Profile.findById(req.params.profileId);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
+    profile.approvalStatus = 'rejected';
+    profile.rejectedReason = rejectedReason || 'Rejected by admin';
+    profile.approvedBy = req.userId;
+    profile.approvedAt = new Date();
+    profile.showInSearch = false;
+
+    await profile.save();
+
     return res.status(200).json({
       success: true,
-      message: 'Database backup initiated',
-      timestamp: new Date(),
-      backupId: `backup_${Date.now()}`
+      message: 'Profile rejected successfully',
+      profile
     });
   } catch (error) {
-    console.error('Backup error:', error);
+    console.error('Reject profile error:', error);
     return res.status(500).json({
-      error: 'Failed to create backup',
+      error: 'Failed to reject profile',
       message: error.message
     });
   }
 });
 
-router.get('/system/logs', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete('/profiles/:profileId', authMiddleware, adminMiddleware, profileIdValidation, async (req, res) => {
   try {
-    const { limit = 100, page = 1, type } = req.query;
+    const profile = await Profile.findById(req.params.profileId);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    profile.isDeleted = true;
+    profile.deletedAt = new Date();
+    profile.deletedBy = req.userId;
+    profile.approvalStatus = 'deleted';
+    profile.showInSearch = false;
+
+    await profile.save();
 
     return res.status(200).json({
       success: true,
-      message: 'System logs retrieved',
-      note: 'Logging system needs to be configured',
-      limit,
-      page,
-      type
+      message: 'Profile deleted successfully'
     });
   } catch (error) {
-    console.error('Get logs error:', error);
+    console.error('Delete profile error:', error);
     return res.status(500).json({
-      error: 'Failed to fetch logs',
-      message: error.message
-    });
-  }
-});
-
-router.get('/audit-trail', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    return res.status(200).json({
-      success: true,
-      message: 'Audit trail retrieved',
-      note: 'AuditLog model needs to be created first'
-    });
-  } catch (error) {
-    console.error('Get audit trail error:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch audit trail',
+      error: 'Failed to delete profile',
       message: error.message
     });
   }
