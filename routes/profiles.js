@@ -277,8 +277,8 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       maritalStatus: req.body.maritalStatus,
       haveChildren: req.body.haveChildren === true || req.body.haveChildren === 'true',
 
-      familyStatus: safeString(req.body.familyStatus),
-      familyValues: safeString(req.body.familyValues),
+      profile.familyStatus = safeString(req.body.familyStatus);
+      profile.familyValues = safeString(req.body.familyValues);
 
       fatherName: req.body.fatherName,
       fatherOccupation: req.body.fatherOccupation,
