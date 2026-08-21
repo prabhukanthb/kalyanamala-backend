@@ -100,10 +100,10 @@ const profileSchema = new mongoose.Schema(
     },
 
     maritalStatus: {
-  type: String,
-  enum: ['Never married', 'Divorced', 'Widowed', 'Awaiting Divorce'],
-  required: true
-},
+      type: String,
+      enum: ['Nevermarried','Divorced','Widowed','AwaitingDivorce'],
+      required: true
+    },
 
     haveChildren: {
       type: Boolean,
@@ -111,15 +111,17 @@ const profileSchema = new mongoose.Schema(
     },
 
     familyStatus: {
-  type: String,
-  enum: ['nuclear_family','joint_family','single_parent','extended_family',''],
-  default: '',
-},
-familyValues: {
-  type: String,
-  enum: ['rich','middle','lower','other',''],
-  default: '',
-},
+      type: String,
+      enum: ['nuclear_family','joint_family','single_parent','extended_family',''],
+      default: ''
+    },
+
+    familyValues: {
+      type: String,
+      enum: ['rich','middle','lower','other',''],
+      default: ''
+    },
+
     fatherName: {
       type: String,
       required: true
