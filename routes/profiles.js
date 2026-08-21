@@ -7,6 +7,14 @@ const Profile = require('../models/Profile');
 const User = require('../models/User');
 
 // ==========================================
+// HELPERS
+// ==========================================
+const safeString = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+};
+
+// ==========================================
 // AUTH MIDDLEWARE
 // ==========================================
 const authMiddleware = (req, res, next) => {
@@ -84,8 +92,8 @@ const profileValidation = [
     .withMessage('Siblings count must be numeric'),
 
   body('maritalStatus')
-  .isIn(['Never married', 'Divorced', 'Widowed', 'Awaiting Divorce'])
-  .withMessage('Valid marital status is required'),
+    .isIn(['Nevermarried','Divorced','Widowed','AwaitingDivorce'])
+    .withMessage('Valid marital status is required'),
 
   body('haveChildren')
     .custom((value) => {
@@ -241,18 +249,18 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       });
     }
 
-const prefix = generateProfilePrefix(req.body.gender);
+    const prefix = generateProfilePrefix(req.body.gender);
 
-const lastProfile = await Profile.findOne({ profileId: new RegExp(`^${prefix}`) })
-  .sort({ createdAt: -1 });
+    const lastProfile = await Profile.findOne({ profileId: new RegExp(`^${prefix}`) })
+      .sort({ createdAt: -1 });
 
-let sequence = 1;
-if (lastProfile?.profileId) {
-  sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
-}
+    let sequence = 1;
+    if (lastProfile?.profileId) {
+      sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
+    }
 
-const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
-    
+    const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
+
     const profile = await Profile.create({
       profileId,
       userId: req.userId,
@@ -269,8 +277,8 @@ const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
       maritalStatus: req.body.maritalStatus,
       haveChildren: req.body.haveChildren === true || req.body.haveChildren === 'true',
 
-      familyStatus: req.body.familyStatus || null,
-      familyValues: req.body.familyValues || null,
+      familyStatus: safeString(req.body.familyStatus),
+      familyValues: safeString(req.body.familyValues),
 
       fatherName: req.body.fatherName,
       fatherOccupation: req.body.fatherOccupation,
@@ -378,8 +386,8 @@ router.put('/me', authMiddleware, profileValidation, async (req, res) => {
     profile.maritalStatus = req.body.maritalStatus;
     profile.haveChildren = req.body.haveChildren === true || req.body.haveChildren === 'true';
 
-    profile.familyStatus = req.body.familyStatus || null;
-    profile.familyValues = req.body.familyValues || null;
+    profile.familyStatus = safeString(req.body.familyStatus);
+    profile.familyValues = safeString(req.body.familyValues);
 
     profile.fatherName = req.body.fatherName;
     profile.fatherOccupation = req.body.fatherOccupation;
