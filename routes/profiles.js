@@ -64,7 +64,7 @@ const requireRole = (...roles) => {
 const profileValidation = [
   body('gender')
     .isIn(['male','female'])
-    .withMessage('Gender must be male or female'),
+    .withMessage('Valid gender is required'),
 
   body('dateOfBirth')
     .isISO8601()
@@ -230,7 +230,10 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
     if (!errors.isEmpty()) {
       return res.status(400).json({
         error: 'Validation failed',
-        details: errors.array().map((e) => e.msg)
+        details: errors.array().map((e) => ({
+          field: e.path,
+          message: e.msg
+        }))
       });
     }
 
@@ -363,7 +366,10 @@ router.put('/me', authMiddleware, profileValidation, async (req, res) => {
     if (!errors.isEmpty()) {
       return res.status(400).json({
         error: 'Validation failed',
-        details: errors.array().map((e) => e.msg)
+        details: errors.array().map((e) => ({
+          field: e.path,
+          message: e.msg
+        }))
       });
     }
 
