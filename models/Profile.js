@@ -1,410 +1,567 @@
-const mongoose = require('mongoose');
+const express = require('express');
+const router = express.Router();
+const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 
-const photoSchema = new mongoose.Schema(
-  {
-    url: { type: String, required: true },
-    isPrimary: { type: Boolean, default: false },
-    isApproved: { type: Boolean, default: false },
-    uploadedAt: { type: Date, default: Date.now },
-    approvedAt: { type: Date, default: null },
-    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
-  },
-  { _id: false }
-);
+const Profile = require('../models/Profile');
+const User = require('../models/User');
 
-const profileSchema = new mongoose.Schema(
-  {
-    profileId: {
-      type: String,
-      unique: true,
-      index: true,
-      default: null
-    },
-
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      unique: true,
-      index: true
-    },
-
-    approvalStatus: {
-      type: String,
-      enum: ['draft','pending','approved','rejected','deleted'],
-      default: 'pending',
-      index: true
-    },
-
-    approvedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null
-    },
-
-    approvedAt: {
-      type: Date,
-      default: null
-    },
-
-    rejectedReason: {
-      type: String,
-      default: null
-    },
-
-    // BASIC DETAILS
-    gender: {
-      type: String,
-      enum: ['male','female'],
-      required: true,
-      index: true
-    },
-
-    dateOfBirth: {
-      type: Date,
-      required: true
-    },
-
-    heightFeet: {
-      type: Number,
-      required: true
-    },
-
-    heightInches: {
-      type: Number,
-      required: true
-    },
-
-    // RELIGION & FAMILY
-    religion: {
-      type: String,
-      enum: ['Christian','Hindu','Ambedkarist','Buddhist','Other'],
-      required: true
-    },
-
-    caste: {
-      type: String,
-      default: 'Mala',
-      immutable: true
-    },
-
-    subCaste: {
-      type: String,
-      enum: ['SC','BC','OC','NA'],
-      required: true
-    },
-
-    siblingsCount: {
-      type: Number,
-      default: 0
-    },
-
-    maritalStatus: {
-      type: String,
-      enum: ['Nevermarried','Divorced','Widowed','AwaitingDivorce'],
-      required: true
-    },
-
-    haveChildren: {
-      type: Boolean,
-      default: false
-    },
-
-    familyStatus: {
-      type: String,
-      enum: ['nuclear_family','joint_family','single_parent','extended_family',''],
-      default: ''
-    },
-
-    familyValues: {
-      type: String,
-      enum: ['rich','middle','lower','other',''],
-      default: ''
-    },
-
-    fatherName: {
-      type: String,
-      required: true
-    },
-
-    fatherOccupation: {
-      type: String,
-      required: true
-    },
-
-    motherName: {
-      type: String,
-      required: true
-    },
-
-    motherOccupation: {
-      type: String,
-      required: true
-    },
-
-    // PROFESSIONAL & EDUCATION
-    highestEducation: {
-      type: String,
-      enum: [
-        '10th Pass',
-        '12th Pass',
-        'Diploma',
-        'ITI',
-        'B.A',
-        'B.Sc',
-        'B.Com',
-        'B.Tech',
-        'M.A',
-        'M.Sc',
-        'M.Com',
-        'M.Tech',
-        'MBA',
-        'MCA',
-        'MBBS',
-        'BDS',
-        'MD',
-        'MS',
-        'PhD',
-        'Other'
-      ],
-      required: true
-    },
-
-    fieldOfStudy: {
-      type: String,
-      required: true
-    },
-
-    college: {
-      type: String,
-      required: true
-    },
-
-    occupation: {
-      type: String,
-      required: true
-    },
-
-    employmentType: {
-      type: String,
-      enum: ['private','public','govt','business','self-employed','other'],
-      required: true
-    },
-
-    companyName: {
-      type: String,
-      required: true
-    },
-
-    jobTitle: {
-      type: String,
-      required: true
-    },
-
-    jobLocation: {
-      type: String,
-      required: true
-    },
-
-    industry: {
-      type: String,
-      required: true
-    },
-
-    income: {
-      type: Number,
-      required: true
-    },
-
-    incomeCurrency: {
-      type: String,
-      default: 'INR',
-      immutable: true
-    },
-
-    // CURRENT ADDRESS
-    currentAddress: {
-      streetName: {
-        type: String,
-        required: true
-      },
-      city: {
-        type: String,
-        required: true
-      },
-      state: {
-        type: String,
-        required: true
-      },
-      country: {
-        type: String,
-        required: true,
-        default: 'India'
-      },
-      pinCode: {
-        type: String,
-        required: true
-      }
-    },
-
-    // ABOUT & PREFERENCE
-    photos: {
-      type: [photoSchema],
-      default: [],
-      validate: {
-        validator: (arr) => arr.length <= 3,
-        message: 'Maximum 3 photos allowed'
-      }
-    },
-
-    aboutMe: {
-      type: String,
-      required: true,
-      maxlength: 2000
-    },
-
-    preferredMatch: {
-      type: String,
-      default: 'any_religion'
-    },
-
-    // VISIBILITY / MEMBERSHIP
-    membershipType: {
-      type: String,
-      enum: ['free','premium'],
-      default: 'free',
-      index: true
-    },
-
-    isPremium: {
-      type: Boolean,
-      default: false
-    },
-
-    showInSearch: {
-      type: Boolean,
-      default: false,
-      index: true
-    },
-
-    hideMobile: {
-      type: Boolean,
-      default: true
-    },
-
-    hideCurrentAddress: {
-      type: Boolean,
-      default: true
-    },
-
-    hideJobLocation: {
-      type: Boolean,
-      default: true
-    },
-
-    // SOFT DELETE
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true
-    },
-
-    deletedAt: {
-      type: Date,
-      default: null
-    },
-
-    deletedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null
-    },
-
-    // STATS
-    profileViews: {
-      type: Number,
-      default: 0
-    },
-
-    interestCount: {
-      type: Number,
-      default: 0
-    },
-
-    profileCompletion: {
-      type: Number,
-      default: 0
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-profileSchema.index({ gender: 1, approvalStatus: 1, showInSearch: 1 });
-profileSchema.index({ religion: 1 });
-profileSchema.index({ membershipType: 1 });
-profileSchema.index({ 'currentAddress.state': 1 });
-profileSchema.index({ 'currentAddress.city': 1 });
-profileSchema.index({ profileId: 1 });
-
-profileSchema.virtual('age').get(function () {
-  if (!this.dateOfBirth) return null;
-  const diff = Date.now() - this.dateOfBirth.getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-});
-
-profileSchema.virtual('primaryPhoto').get(function () {
-  return this.photos.find((p) => p.isPrimary) || null;
-});
-
-profileSchema.methods.calculateCompletion = function () {
-  const requiredFields = [
-    'gender',
-    'dateOfBirth',
-    'heightFeet',
-    'heightInches',
-    'religion',
-    'subCaste',
-    'siblingsCount',
-    'maritalStatus',
-    'haveChildren',
-    'fatherName',
-    'fatherOccupation',
-    'motherName',
-    'motherOccupation',
-    'highestEducation',
-    'fieldOfStudy',
-    'college',
-    'occupation',
-    'employmentType',
-    'companyName',
-    'jobTitle',
-    'jobLocation',
-    'industry',
-    'income',
-    'currentAddress.streetName',
-    'currentAddress.city',
-    'currentAddress.state',
-    'currentAddress.country',
-    'currentAddress.pinCode',
-    'aboutMe'
-  ];
-
-  let filled = 0;
-
-  requiredFields.forEach((field) => {
-    const value = field.split('.').reduce((obj, key) => obj?.[key], this);
-    if (value !== undefined && value !== null && value !== '') filled++;
-  });
-
-  this.profileCompletion = Math.round((filled / requiredFields.length) * 100);
-  return this.profileCompletion;
+// ==========================================
+// HELPERS
+// ==========================================
+const safeString = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
 };
 
-profileSchema.pre('save', function (next) {
-  this.calculateCompletion();
-  next();
+// ==========================================
+// AUTH MIDDLEWARE
+// ==========================================
+const authMiddleware = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
+    if (!token) {
+      return res.status(401).json({
+        error: 'No token provided',
+        message: 'Authorization token is required'
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.userId;
+    req.userRole = decoded.role;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      error: 'Invalid token',
+      message: 'Authentication failed'
+    });
+  }
+};
+
+// ==========================================
+// ROLE MIDDLEWARE
+// ==========================================
+const requireRole = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.userRole)) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You do not have permission to perform this action'
+      });
+    }
+    next();
+  };
+};
+
+// ==========================================
+// VALIDATION
+// ==========================================
+const profileValidation = [
+  body('gender')
+    .isIn(['male','female'])
+    .withMessage('Valid gender is required'),
+
+  body('dateOfBirth')
+    .isISO8601()
+    .withMessage('Date of birth is required'),
+
+  body('heightFeet')
+    .isNumeric()
+    .withMessage('Height feet is required'),
+
+  body('heightInches')
+    .isNumeric()
+    .withMessage('Height inches is required'),
+
+  body('religion')
+    .isIn(['Christian','Hindu','Ambedkarist','Buddhist','Other'])
+    .withMessage('Valid religion is required'),
+
+  body('subCaste')
+    .isIn(['SC','BC','OC','NA'])
+    .withMessage('Valid sub caste is required'),
+
+  body('siblingsCount')
+    .optional()
+    .isNumeric()
+    .withMessage('Siblings count must be numeric'),
+
+  body('maritalStatus')
+    .isIn(['Nevermarried','Divorced','Widowed','AwaitingDivorce'])
+    .withMessage('Valid marital status is required'),
+
+  body('haveChildren')
+    .custom((value) => {
+      if (
+        value === true ||
+        value === false ||
+        value === 'true' ||
+        value === 'false'
+      ) {
+        return true;
+      }
+      throw new Error('Have Children must be true or false');
+    }),
+
+  body('fatherName')
+    .notEmpty()
+    .withMessage('Father name is required'),
+
+  body('fatherOccupation')
+    .notEmpty()
+    .withMessage('Father occupation is required'),
+
+  body('motherName')
+    .notEmpty()
+    .withMessage('Mother name is required'),
+
+  body('motherOccupation')
+    .notEmpty()
+    .withMessage('Mother occupation is required'),
+
+  body('highestEducation')
+    .isIn([
+      '10th Pass',
+      '12th Pass',
+      'Diploma',
+      'ITI',
+      'B.A',
+      'B.Sc',
+      'B.Com',
+      'B.Tech',
+      'M.A',
+      'M.Sc',
+      'M.Com',
+      'M.Tech',
+      'MBA',
+      'MCA',
+      'MBBS',
+      'BDS',
+      'MD',
+      'MS',
+      'PhD',
+      'Other'
+    ])
+    .withMessage('Valid highest education is required'),
+
+  body('fieldOfStudy')
+    .notEmpty()
+    .withMessage('Field of study is required'),
+
+  body('college')
+    .notEmpty()
+    .withMessage('College is required'),
+
+  body('occupation')
+    .notEmpty()
+    .withMessage('Occupation is required'),
+
+  body('employmentType')
+    .isIn(['private','public','govt','business','self-employed','other'])
+    .withMessage('Valid employment type is required'),
+
+  body('companyName')
+    .notEmpty()
+    .withMessage('Company name is required'),
+
+  body('jobTitle')
+    .notEmpty()
+    .withMessage('Job title is required'),
+
+  body('jobLocation')
+    .notEmpty()
+    .withMessage('Job location is required'),
+
+  body('industry')
+    .notEmpty()
+    .withMessage('Industry is required'),
+
+  body('income')
+    .isNumeric()
+    .withMessage('Income is required'),
+
+  body('currentAddress.streetName')
+    .notEmpty()
+    .withMessage('Street name is required'),
+
+  body('currentAddress.city')
+    .notEmpty()
+    .withMessage('City is required'),
+
+  body('currentAddress.state')
+    .notEmpty()
+    .withMessage('State is required'),
+
+  body('currentAddress.country')
+    .notEmpty()
+    .withMessage('Country is required'),
+
+  body('currentAddress.pinCode')
+    .notEmpty()
+    .withMessage('Pin code is required'),
+
+  body('aboutMe')
+    .notEmpty()
+    .withMessage('About me is required')
+];
+
+// ==========================================
+// PROFILE ID GENERATOR
+// ==========================================
+function generateProfilePrefix(gender) {
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const genderCode = gender === 'male' ? 'M' : 'F';
+  return `KM-${yy}${mm}${genderCode}`;
+}
+
+// ==========================================
+// CREATE PROFILE
+// ==========================================
+router.post('/', authMiddleware, profileValidation, async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array().map((e) => ({
+          field: e.path,
+          message: e.msg
+        }))
+      });
+    }
+
+    const existingProfile = await Profile.findOne({ userId: req.userId });
+    if (existingProfile) {
+      return res.status(400).json({
+        error: 'Profile already exists',
+        message: 'User can only have one profile'
+      });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found'
+      });
+    }
+
+    const prefix = generateProfilePrefix(req.body.gender);
+
+    const lastProfile = await Profile.findOne({ profileId: new RegExp(`^${prefix}`) })
+      .sort({ createdAt: -1 });
+
+    let sequence = 1;
+    if (lastProfile?.profileId) {
+      sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
+    }
+
+    const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
+
+    const profile = await Profile.create({
+      profileId,
+      userId: req.userId,
+
+      gender: req.body.gender,
+      dateOfBirth: req.body.dateOfBirth,
+      heightFeet: Number(req.body.heightFeet),
+      heightInches: Number(req.body.heightInches),
+
+      religion: req.body.religion,
+      caste: 'Mala',
+      subCaste: req.body.subCaste,
+      siblingsCount: Number(req.body.siblingsCount || 0),
+      maritalStatus: req.body.maritalStatus,
+      haveChildren: req.body.haveChildren === true || req.body.haveChildren === 'true',
+
+      familyStatus: safeString(req.body.familyStatus),
+      familyValues: safeString(req.body.familyValues),
+
+      fatherName: req.body.fatherName,
+      fatherOccupation: req.body.fatherOccupation,
+      motherName: req.body.motherName,
+      motherOccupation: req.body.motherOccupation,
+
+      highestEducation: req.body.highestEducation,
+      fieldOfStudy: req.body.fieldOfStudy,
+      college: req.body.college,
+      occupation: req.body.occupation,
+      employmentType: req.body.employmentType,
+      companyName: req.body.companyName,
+      jobTitle: req.body.jobTitle,
+      jobLocation: req.body.jobLocation,
+      industry: req.body.industry,
+      income: Number(req.body.income),
+      incomeCurrency: 'INR',
+
+      currentAddress: {
+        streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
+        city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
+        state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
+        country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
+        pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
+      },
+
+      photos: Array.isArray(req.body.photos) ? req.body.photos.slice(0, 3) : [],
+      aboutMe: req.body.aboutMe,
+      preferredMatch: req.body.preferredMatch || 'any_religion',
+
+      approvalStatus: 'pending',
+      showInSearch: false
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Profile created successfully',
+      profile
+    });
+  } catch (error) {
+    console.error('Create profile error:', error);
+    return res.status(500).json({
+      error: 'Failed to create profile',
+      message: error.message
+    });
+  }
 });
 
-module.exports = mongoose.model('Profile', profileSchema);
+// ==========================================
+// GET MY PROFILE
+// ==========================================
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const profile = await Profile.findOne({ userId: req.userId })
+      .populate('userId', 'email firstName lastName surname phone role status');
+
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: 'create profile first'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      profile
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to fetch profile',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// UPDATE MY PROFILE
+// ==========================================
+router.put('/me', authMiddleware, profileValidation, async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array().map((e) => ({
+          field: e.path,
+          message: e.msg
+        }))
+      });
+    }
+
+    const profile = await Profile.findOne({ userId: req.userId });
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Profile not found'
+      });
+    }
+
+    profile.gender = req.body.gender;
+    profile.dateOfBirth = req.body.dateOfBirth;
+    profile.heightFeet = Number(req.body.heightFeet);
+    profile.heightInches = Number(req.body.heightInches);
+
+    profile.religion = req.body.religion;
+    profile.caste = 'Mala';
+    profile.subCaste = req.body.subCaste;
+    profile.siblingsCount = Number(req.body.siblingsCount || 0);
+    profile.maritalStatus = req.body.maritalStatus;
+    profile.haveChildren = req.body.haveChildren === true || req.body.haveChildren === 'true';
+
+    profile.familyStatus = safeString(req.body.familyStatus);
+    profile.familyValues = safeString(req.body.familyValues);
+
+    profile.fatherName = req.body.fatherName;
+    profile.fatherOccupation = req.body.fatherOccupation;
+    profile.motherName = req.body.motherName;
+    profile.motherOccupation = req.body.motherOccupation;
+
+    profile.highestEducation = req.body.highestEducation;
+    profile.fieldOfStudy = req.body.fieldOfStudy;
+    profile.college = req.body.college;
+    profile.occupation = req.body.occupation;
+    profile.employmentType = req.body.employmentType;
+    profile.companyName = req.body.companyName;
+    profile.jobTitle = req.body.jobTitle;
+    profile.jobLocation = req.body.jobLocation;
+    profile.industry = req.body.industry;
+    profile.income = Number(req.body.income);
+    profile.incomeCurrency = 'INR';
+
+    profile.currentAddress = {
+      streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
+      city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
+      state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
+      country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
+      pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
+    };
+
+    profile.aboutMe = req.body.aboutMe;
+    profile.preferredMatch = req.body.preferredMatch || 'any_religion';
+
+    if (req.body.photos !== undefined && Array.isArray(req.body.photos)) {
+      profile.photos = req.body.photos.slice(0, 3);
+    }
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      profile
+    });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    return res.status(500).json({
+      error: 'Failed to update profile',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN / SUBADMIN: LIST ALL PROFILES
+// ==========================================
+router.get('/', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
+  try {
+    const profiles = await Profile.find()
+      .populate('userId', 'email firstName lastName surname phone role status')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: profiles.length,
+      profiles
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to fetch profiles',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN / SUBADMIN: APPROVE PROFILE
+// ==========================================
+router.put('/:id/approve', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id);
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Profile not found'
+      });
+    }
+
+    profile.approvalStatus = 'approved';
+    profile.approvedBy = req.userId;
+    profile.approvedAt = new Date();
+    profile.showInSearch = true;
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile approved successfully',
+      profile
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to approve profile',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN / SUBADMIN: REJECT PROFILE
+// ==========================================
+router.put('/:id/reject', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
+  try {
+    const { rejectedReason } = req.body;
+
+    const profile = await Profile.findById(req.params.id);
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Profile not found'
+      });
+    }
+
+    profile.approvalStatus = 'rejected';
+    profile.rejectedReason = rejectedReason || 'Rejected by admin';
+    profile.approvedBy = req.userId;
+    profile.approvedAt = new Date();
+    profile.showInSearch = false;
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile rejected successfully',
+      profile
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to reject profile',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN / SUBADMIN: SOFT DELETE PROFILE
+// ==========================================
+router.delete('/:id', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id);
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Profile not found'
+      });
+    }
+
+    profile.isDeleted = true;
+    profile.deletedAt = new Date();
+    profile.deletedBy = req.userId;
+    profile.approvalStatus = 'deleted';
+    profile.showInSearch = false;
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile deleted successfully'
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to delete profile',
+      message: error.message
+    });
+  }
+});
+
+module.exports = router;
