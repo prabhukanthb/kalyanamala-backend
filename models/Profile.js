@@ -110,18 +110,6 @@ const profileSchema = new mongoose.Schema(
       default: false
     },
 
-    familyStatus: {
-      type: String,
-      enum: ['nuclear_family','joint_family','single_parent','extended_family',''],
-      default: ''
-    },
-
-    familyValues: {
-      type: String,
-      enum: ['rich','middle','lower','other','orthodox',''],
-      default: ''
-    },
-
     fatherName: {
       type: String,
       required: true
