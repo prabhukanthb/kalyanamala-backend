@@ -7,14 +7,6 @@ const Profile = require('../models/Profile');
 const User = require('../models/User');
 
 // ==========================================
-// HELPERS
-// ==========================================
-const safeString = (value) => {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-};
-
-// ==========================================
 // AUTH MIDDLEWARE
 // ==========================================
 const authMiddleware = (req, res, next) => {
@@ -280,9 +272,6 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       maritalStatus: req.body.maritalStatus,
       haveChildren: req.body.haveChildren === true || req.body.haveChildren === 'true',
 
-      familyStatus: safeString(req.body.familyStatus),
-      familyValues: safeString(req.body.familyValues),
-
       fatherName: req.body.fatherName,
       fatherOccupation: req.body.fatherOccupation,
       motherName: req.body.motherName,
@@ -392,9 +381,6 @@ router.put('/me', authMiddleware, profileValidation, async (req, res) => {
     profile.maritalStatus = req.body.maritalStatus;
     profile.haveChildren = req.body.haveChildren === true || req.body.haveChildren === 'true';
 
-    profile.familyStatus = safeString(req.body.familyStatus);
-    profile.familyValues = safeString(req.body.familyValues);
-
     profile.fatherName = req.body.fatherName;
     profile.fatherOccupation = req.body.fatherOccupation;
     profile.motherName = req.body.motherName;
@@ -460,6 +446,109 @@ router.get('/', authMiddleware, requireRole('admin', 'subadmin'), async (req, re
   } catch (error) {
     return res.status(500).json({
       error: 'Failed to fetch profiles',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN / SUBADMIN: GET PROFILE BY ID
+// ==========================================
+router.get('/:id', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id)
+      .populate('userId', 'email firstName lastName surname phone role status');
+
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Profile not found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      profile
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Failed to fetch profile',
+      message: error.message
+    });
+  }
+});
+
+// ==========================================
+// ADMIN / SUBADMIN: UPDATE PROFILE
+// ==========================================
+router.put('/:id', authMiddleware, requireRole('admin', 'subadmin'), async (req, res) => {
+  try {
+    const profile = await Profile.findById(req.params.id);
+    if (!profile) {
+      return res.status(404).json({
+        error: 'Profile not found'
+      });
+    }
+
+    profile.gender = req.body.gender ?? profile.gender;
+    profile.dateOfBirth = req.body.dateOfBirth ?? profile.dateOfBirth;
+    profile.heightFeet = req.body.heightFeet !== undefined ? Number(req.body.heightFeet) : profile.heightFeet;
+    profile.heightInches = req.body.heightInches !== undefined ? Number(req.body.heightInches) : profile.heightInches;
+
+    profile.religion = req.body.religion ?? profile.religion;
+    profile.caste = req.body.caste ?? profile.caste;
+    profile.subCaste = req.body.subCaste ?? profile.subCaste;
+    profile.siblingsCount = req.body.siblingsCount !== undefined ? Number(req.body.siblingsCount) : profile.siblingsCount;
+    profile.maritalStatus = req.body.maritalStatus ?? profile.maritalStatus;
+    profile.haveChildren = req.body.haveChildren !== undefined
+      ? (req.body.haveChildren === true || req.body.haveChildren === 'true')
+      : profile.haveChildren;
+
+    profile.fatherName = req.body.fatherName ?? profile.fatherName;
+    profile.fatherOccupation = req.body.fatherOccupation ?? profile.fatherOccupation;
+    profile.motherName = req.body.motherName ?? profile.motherName;
+    profile.motherOccupation = req.body.motherOccupation ?? profile.motherOccupation;
+
+    profile.highestEducation = req.body.highestEducation ?? profile.highestEducation;
+    profile.fieldOfStudy = req.body.fieldOfStudy ?? profile.fieldOfStudy;
+    profile.college = req.body.college ?? profile.college;
+    profile.occupation = req.body.occupation ?? profile.occupation;
+    profile.employmentType = req.body.employmentType ?? profile.employmentType;
+    profile.companyName = req.body.companyName ?? profile.companyName;
+    profile.jobTitle = req.body.jobTitle ?? profile.jobTitle;
+    profile.jobLocation = req.body.jobLocation ?? profile.jobLocation;
+    profile.industry = req.body.industry ?? profile.industry;
+    profile.income = req.body.income !== undefined ? Number(req.body.income) : profile.income;
+
+    if (req.body.currentAddress) {
+      profile.currentAddress = {
+        streetName: req.body.currentAddress.streetName ?? profile.currentAddress?.streetName,
+        city: req.body.currentAddress.city ?? profile.currentAddress?.city,
+        state: req.body.currentAddress.state ?? profile.currentAddress?.state,
+        country: req.body.currentAddress.country ?? profile.currentAddress?.country,
+        pinCode: req.body.currentAddress.pinCode ?? profile.currentAddress?.pinCode
+      };
+    }
+
+    profile.aboutMe = req.body.aboutMe ?? profile.aboutMe;
+    profile.preferredMatch = req.body.preferredMatch ?? profile.preferredMatch;
+    profile.approvalStatus = req.body.approvalStatus ?? profile.approvalStatus;
+    profile.showInSearch = req.body.showInSearch ?? profile.showInSearch;
+
+    if (req.body.photos !== undefined && Array.isArray(req.body.photos)) {
+      profile.photos = req.body.photos.slice(0, 3);
+    }
+
+    await profile.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Profile updated by admin successfully',
+      profile
+    });
+  } catch (error) {
+    console.error('Admin profile update error:', error);
+    return res.status(500).json({
+      error: 'Failed to update profile',
       message: error.message
     });
   }
