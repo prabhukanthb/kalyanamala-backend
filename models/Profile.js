@@ -96,6 +96,7 @@ const profileSchema = new mongoose.Schema(
 
     siblingsCount: {
       type: Number,
+      enum: [0,1,2,3],
       default: 0
     },
 
@@ -105,32 +106,32 @@ const profileSchema = new mongoose.Schema(
       required: true
     },
 
-    haveChildren: {
-      type: Boolean,
-      default: false
-    },
-
+    // PARENTS
     fatherName: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     fatherOccupation: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     motherName: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     motherOccupation: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
-    // PROFESSIONAL & EDUCATION
+    // EDUCATION & WORK
     highestEducation: {
       type: String,
       enum: [
@@ -160,43 +161,50 @@ const profileSchema = new mongoose.Schema(
 
     fieldOfStudy: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     college: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     occupation: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     employmentType: {
       type: String,
-      enum: ['private','public','govt','business','self-employed','other'],
-      required: true
+      required: true,
+      trim: true
     },
 
     companyName: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     jobTitle: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     jobLocation: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     industry: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
 
     income: {
@@ -214,24 +222,29 @@ const profileSchema = new mongoose.Schema(
     currentAddress: {
       streetName: {
         type: String,
-        required: true
+        required: true,
+        trim: true
       },
       city: {
         type: String,
-        required: true
+        required: true,
+        trim: true
       },
       state: {
         type: String,
-        required: true
+        required: true,
+        trim: true
       },
       country: {
         type: String,
         required: true,
-        default: 'India'
+        default: 'India',
+        trim: true
       },
       pinCode: {
         type: String,
-        required: true
+        required: true,
+        trim: true
       }
     },
 
@@ -248,7 +261,8 @@ const profileSchema = new mongoose.Schema(
     aboutMe: {
       type: String,
       required: true,
-      maxlength: 2000
+      maxlength: 2000,
+      trim: true
     },
 
     preferredMatch: {
@@ -356,7 +370,6 @@ profileSchema.methods.calculateCompletion = function () {
     'subCaste',
     'siblingsCount',
     'maritalStatus',
-    'haveChildren',
     'fatherName',
     'fatherOccupation',
     'motherName',
