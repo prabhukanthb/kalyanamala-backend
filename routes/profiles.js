@@ -51,6 +51,31 @@ const requireRole = (...roles) => {
 };
 
 // ==========================================
+// HELPERS
+// ==========================================
+const safeString = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+};
+
+const getAge = (dateOfBirth) => {
+  if (!dateOfBirth) return null;
+  const birth = new Date(dateOfBirth);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const isAdult = (dateOfBirth) => {
+  const age = getAge(dateOfBirth);
+  return age !== null && age >= 18;
+};
+
+// ==========================================
 // VALIDATION
 // ==========================================
 const profileValidation = [
@@ -60,15 +85,21 @@ const profileValidation = [
 
   body('dateOfBirth')
     .isISO8601()
-    .withMessage('Date of birth is required'),
+    .withMessage('Date of birth is required')
+    .custom((value) => {
+      if (!isAdult(value)) {
+        throw new Error('User must be at least 18 years old');
+      }
+      return true;
+    }),
 
   body('heightFeet')
-    .isNumeric()
-    .withMessage('Height feet is required'),
+    .isInt({ min: 4, max: 7 })
+    .withMessage('Height feet must be between 4 and 7'),
 
   body('heightInches')
-    .isNumeric()
-    .withMessage('Height inches is required'),
+    .isInt({ min: 0, max: 11 })
+    .withMessage('Height inches must be between 0 and 11'),
 
   body('religion')
     .isIn(['Christian','Hindu','Ambedkarist','Buddhist','Other'])
@@ -79,40 +110,30 @@ const profileValidation = [
     .withMessage('Valid sub caste is required'),
 
   body('siblingsCount')
-    .optional()
-    .isNumeric()
-    .withMessage('Siblings count must be numeric'),
+    .isInt({ min: 0, max: 3 })
+    .withMessage('Siblings count must be between 0 and 3'),
 
   body('maritalStatus')
     .isIn(['Nevermarried','Divorced','Widowed','AwaitingDivorce'])
     .withMessage('Valid marital status is required'),
 
-  body('haveChildren')
-    .custom((value) => {
-      if (
-        value === true ||
-        value === false ||
-        value === 'true' ||
-        value === 'false'
-      ) {
-        return true;
-      }
-      throw new Error('Have Children must be true or false');
-    }),
-
   body('fatherName')
+    .trim()
     .notEmpty()
     .withMessage('Father name is required'),
 
   body('fatherOccupation')
+    .trim()
     .notEmpty()
     .withMessage('Father occupation is required'),
 
   body('motherName')
+    .trim()
     .notEmpty()
     .withMessage('Mother name is required'),
 
   body('motherOccupation')
+    .trim()
     .notEmpty()
     .withMessage('Mother occupation is required'),
 
@@ -142,62 +163,76 @@ const profileValidation = [
     .withMessage('Valid highest education is required'),
 
   body('fieldOfStudy')
+    .trim()
     .notEmpty()
     .withMessage('Field of study is required'),
 
   body('college')
+    .trim()
     .notEmpty()
     .withMessage('College is required'),
 
   body('occupation')
+    .trim()
     .notEmpty()
     .withMessage('Occupation is required'),
 
   body('employmentType')
-    .isIn(['private','public','govt','business','self-employed','other'])
-    .withMessage('Valid employment type is required'),
+    .trim()
+    .notEmpty()
+    .withMessage('Employment type is required'),
 
   body('companyName')
+    .trim()
     .notEmpty()
     .withMessage('Company name is required'),
 
   body('jobTitle')
+    .trim()
     .notEmpty()
     .withMessage('Job title is required'),
 
   body('jobLocation')
+    .trim()
     .notEmpty()
     .withMessage('Job location is required'),
 
   body('industry')
+    .trim()
     .notEmpty()
     .withMessage('Industry is required'),
 
   body('income')
     .isNumeric()
-    .withMessage('Income is required'),
+    .withMessage('Income must be a number'),
 
   body('currentAddress.streetName')
+    .trim()
     .notEmpty()
     .withMessage('Street name is required'),
 
   body('currentAddress.city')
+    .trim()
     .notEmpty()
     .withMessage('City is required'),
 
   body('currentAddress.state')
+    .trim()
     .notEmpty()
     .withMessage('State is required'),
 
   body('currentAddress.country')
+    .trim()
     .notEmpty()
     .withMessage('Country is required'),
 
   body('currentAddress.pinCode')
+    .trim()
     .notEmpty()
     .withMessage('Pin code is required'),
 
   body('aboutMe')
+    .trim()
     .notEmpty()
     .withMessage('About me is required')
 ];
@@ -268,38 +303,37 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       religion: req.body.religion,
       caste: 'Mala',
       subCaste: req.body.subCaste,
-      siblingsCount: Number(req.body.siblingsCount || 0),
+      siblingsCount: Number(req.body.siblingsCount),
       maritalStatus: req.body.maritalStatus,
-      haveChildren: req.body.haveChildren === true || req.body.haveChildren === 'true',
 
-      fatherName: req.body.fatherName,
-      fatherOccupation: req.body.fatherOccupation,
-      motherName: req.body.motherName,
-      motherOccupation: req.body.motherOccupation,
+      fatherName: safeString(req.body.fatherName),
+      fatherOccupation: safeString(req.body.fatherOccupation),
+      motherName: safeString(req.body.motherName),
+      motherOccupation: safeString(req.body.motherOccupation),
 
       highestEducation: req.body.highestEducation,
-      fieldOfStudy: req.body.fieldOfStudy,
-      college: req.body.college,
-      occupation: req.body.occupation,
-      employmentType: req.body.employmentType,
-      companyName: req.body.companyName,
-      jobTitle: req.body.jobTitle,
-      jobLocation: req.body.jobLocation,
-      industry: req.body.industry,
+      fieldOfStudy: safeString(req.body.fieldOfStudy),
+      college: safeString(req.body.college),
+      occupation: safeString(req.body.occupation),
+      employmentType: safeString(req.body.employmentType),
+      companyName: safeString(req.body.companyName),
+      jobTitle: safeString(req.body.jobTitle),
+      jobLocation: safeString(req.body.jobLocation),
+      industry: safeString(req.body.industry),
       income: Number(req.body.income),
       incomeCurrency: 'INR',
 
       currentAddress: {
-        streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
-        city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
-        state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
-        country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
-        pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
+        streetName: safeString(req.body.currentAddress?.streetName || req.body['currentAddress[streetName]']),
+        city: safeString(req.body.currentAddress?.city || req.body['currentAddress[city]']),
+        state: safeString(req.body.currentAddress?.state || req.body['currentAddress[state]']),
+        country: safeString(req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India'),
+        pinCode: safeString(req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]'])
       },
 
       photos: Array.isArray(req.body.photos) ? req.body.photos.slice(0, 3) : [],
-      aboutMe: req.body.aboutMe,
-      preferredMatch: req.body.preferredMatch || 'any_religion',
+      aboutMe: safeString(req.body.aboutMe),
+      preferredMatch: safeString(req.body.preferredMatch || 'any_religion'),
 
       approvalStatus: 'pending',
       showInSearch: false
@@ -330,7 +364,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     if (!profile) {
       return res.status(404).json({
         error: 'Profile not found',
-        message: 'create profile first'
+        message: 'Create profile first'
       });
     }
 
@@ -377,37 +411,36 @@ router.put('/me', authMiddleware, profileValidation, async (req, res) => {
     profile.religion = req.body.religion;
     profile.caste = 'Mala';
     profile.subCaste = req.body.subCaste;
-    profile.siblingsCount = Number(req.body.siblingsCount || 0);
+    profile.siblingsCount = Number(req.body.siblingsCount);
     profile.maritalStatus = req.body.maritalStatus;
-    profile.haveChildren = req.body.haveChildren === true || req.body.haveChildren === 'true';
 
-    profile.fatherName = req.body.fatherName;
-    profile.fatherOccupation = req.body.fatherOccupation;
-    profile.motherName = req.body.motherName;
-    profile.motherOccupation = req.body.motherOccupation;
+    profile.fatherName = safeString(req.body.fatherName);
+    profile.fatherOccupation = safeString(req.body.fatherOccupation);
+    profile.motherName = safeString(req.body.motherName);
+    profile.motherOccupation = safeString(req.body.motherOccupation);
 
     profile.highestEducation = req.body.highestEducation;
-    profile.fieldOfStudy = req.body.fieldOfStudy;
-    profile.college = req.body.college;
-    profile.occupation = req.body.occupation;
-    profile.employmentType = req.body.employmentType;
-    profile.companyName = req.body.companyName;
-    profile.jobTitle = req.body.jobTitle;
-    profile.jobLocation = req.body.jobLocation;
-    profile.industry = req.body.industry;
+    profile.fieldOfStudy = safeString(req.body.fieldOfStudy);
+    profile.college = safeString(req.body.college);
+    profile.occupation = safeString(req.body.occupation);
+    profile.employmentType = safeString(req.body.employmentType);
+    profile.companyName = safeString(req.body.companyName);
+    profile.jobTitle = safeString(req.body.jobTitle);
+    profile.jobLocation = safeString(req.body.jobLocation);
+    profile.industry = safeString(req.body.industry);
     profile.income = Number(req.body.income);
     profile.incomeCurrency = 'INR';
 
     profile.currentAddress = {
-      streetName: req.body.currentAddress?.streetName || req.body['currentAddress[streetName]'],
-      city: req.body.currentAddress?.city || req.body['currentAddress[city]'],
-      state: req.body.currentAddress?.state || req.body['currentAddress[state]'],
-      country: req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India',
-      pinCode: req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]']
+      streetName: safeString(req.body.currentAddress?.streetName || req.body['currentAddress[streetName]']),
+      city: safeString(req.body.currentAddress?.city || req.body['currentAddress[city]']),
+      state: safeString(req.body.currentAddress?.state || req.body['currentAddress[state]']),
+      country: safeString(req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India'),
+      pinCode: safeString(req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]'])
     };
 
-    profile.aboutMe = req.body.aboutMe;
-    profile.preferredMatch = req.body.preferredMatch || 'any_religion';
+    profile.aboutMe = safeString(req.body.aboutMe);
+    profile.preferredMatch = safeString(req.body.preferredMatch || 'any_religion');
 
     if (req.body.photos !== undefined && Array.isArray(req.body.photos)) {
       profile.photos = req.body.photos.slice(0, 3);
@@ -489,50 +522,47 @@ router.put('/:id', authMiddleware, requireRole('admin', 'subadmin'), async (req,
       });
     }
 
-    profile.gender = req.body.gender ?? profile.gender;
-    profile.dateOfBirth = req.body.dateOfBirth ?? profile.dateOfBirth;
-    profile.heightFeet = req.body.heightFeet !== undefined ? Number(req.body.heightFeet) : profile.heightFeet;
-    profile.heightInches = req.body.heightInches !== undefined ? Number(req.body.heightInches) : profile.heightInches;
+    if (req.body.gender !== undefined) profile.gender = req.body.gender;
+    if (req.body.dateOfBirth !== undefined) profile.dateOfBirth = req.body.dateOfBirth;
+    if (req.body.heightFeet !== undefined) profile.heightFeet = Number(req.body.heightFeet);
+    if (req.body.heightInches !== undefined) profile.heightInches = Number(req.body.heightInches);
 
-    profile.religion = req.body.religion ?? profile.religion;
-    profile.caste = req.body.caste ?? profile.caste;
-    profile.subCaste = req.body.subCaste ?? profile.subCaste;
-    profile.siblingsCount = req.body.siblingsCount !== undefined ? Number(req.body.siblingsCount) : profile.siblingsCount;
-    profile.maritalStatus = req.body.maritalStatus ?? profile.maritalStatus;
-    profile.haveChildren = req.body.haveChildren !== undefined
-      ? (req.body.haveChildren === true || req.body.haveChildren === 'true')
-      : profile.haveChildren;
+    if (req.body.religion !== undefined) profile.religion = req.body.religion;
+    if (req.body.caste !== undefined) profile.caste = req.body.caste;
+    if (req.body.subCaste !== undefined) profile.subCaste = req.body.subCaste;
+    if (req.body.siblingsCount !== undefined) profile.siblingsCount = Number(req.body.siblingsCount);
+    if (req.body.maritalStatus !== undefined) profile.maritalStatus = req.body.maritalStatus;
 
-    profile.fatherName = req.body.fatherName ?? profile.fatherName;
-    profile.fatherOccupation = req.body.fatherOccupation ?? profile.fatherOccupation;
-    profile.motherName = req.body.motherName ?? profile.motherName;
-    profile.motherOccupation = req.body.motherOccupation ?? profile.motherOccupation;
+    if (req.body.fatherName !== undefined) profile.fatherName = safeString(req.body.fatherName);
+    if (req.body.fatherOccupation !== undefined) profile.fatherOccupation = safeString(req.body.fatherOccupation);
+    if (req.body.motherName !== undefined) profile.motherName = safeString(req.body.motherName);
+    if (req.body.motherOccupation !== undefined) profile.motherOccupation = safeString(req.body.motherOccupation);
 
-    profile.highestEducation = req.body.highestEducation ?? profile.highestEducation;
-    profile.fieldOfStudy = req.body.fieldOfStudy ?? profile.fieldOfStudy;
-    profile.college = req.body.college ?? profile.college;
-    profile.occupation = req.body.occupation ?? profile.occupation;
-    profile.employmentType = req.body.employmentType ?? profile.employmentType;
-    profile.companyName = req.body.companyName ?? profile.companyName;
-    profile.jobTitle = req.body.jobTitle ?? profile.jobTitle;
-    profile.jobLocation = req.body.jobLocation ?? profile.jobLocation;
-    profile.industry = req.body.industry ?? profile.industry;
-    profile.income = req.body.income !== undefined ? Number(req.body.income) : profile.income;
+    if (req.body.highestEducation !== undefined) profile.highestEducation = req.body.highestEducation;
+    if (req.body.fieldOfStudy !== undefined) profile.fieldOfStudy = safeString(req.body.fieldOfStudy);
+    if (req.body.college !== undefined) profile.college = safeString(req.body.college);
+    if (req.body.occupation !== undefined) profile.occupation = safeString(req.body.occupation);
+    if (req.body.employmentType !== undefined) profile.employmentType = safeString(req.body.employmentType);
+    if (req.body.companyName !== undefined) profile.companyName = safeString(req.body.companyName);
+    if (req.body.jobTitle !== undefined) profile.jobTitle = safeString(req.body.jobTitle);
+    if (req.body.jobLocation !== undefined) profile.jobLocation = safeString(req.body.jobLocation);
+    if (req.body.industry !== undefined) profile.industry = safeString(req.body.industry);
+    if (req.body.income !== undefined) profile.income = Number(req.body.income);
 
     if (req.body.currentAddress) {
       profile.currentAddress = {
-        streetName: req.body.currentAddress.streetName ?? profile.currentAddress?.streetName,
-        city: req.body.currentAddress.city ?? profile.currentAddress?.city,
-        state: req.body.currentAddress.state ?? profile.currentAddress?.state,
-        country: req.body.currentAddress.country ?? profile.currentAddress?.country,
-        pinCode: req.body.currentAddress.pinCode ?? profile.currentAddress?.pinCode
+        streetName: safeString(req.body.currentAddress.streetName ?? profile.currentAddress?.streetName),
+        city: safeString(req.body.currentAddress.city ?? profile.currentAddress?.city),
+        state: safeString(req.body.currentAddress.state ?? profile.currentAddress?.state),
+        country: safeString(req.body.currentAddress.country ?? profile.currentAddress?.country),
+        pinCode: safeString(req.body.currentAddress.pinCode ?? profile.currentAddress?.pinCode)
       };
     }
 
-    profile.aboutMe = req.body.aboutMe ?? profile.aboutMe;
-    profile.preferredMatch = req.body.preferredMatch ?? profile.preferredMatch;
-    profile.approvalStatus = req.body.approvalStatus ?? profile.approvalStatus;
-    profile.showInSearch = req.body.showInSearch ?? profile.showInSearch;
+    if (req.body.aboutMe !== undefined) profile.aboutMe = safeString(req.body.aboutMe);
+    if (req.body.preferredMatch !== undefined) profile.preferredMatch = safeString(req.body.preferredMatch);
+    if (req.body.approvalStatus !== undefined) profile.approvalStatus = req.body.approvalStatus;
+    if (req.body.showInSearch !== undefined) profile.showInSearch = req.body.showInSearch === true || req.body.showInSearch === 'true';
 
     if (req.body.photos !== undefined && Array.isArray(req.body.photos)) {
       profile.photos = req.body.photos.slice(0, 3);
