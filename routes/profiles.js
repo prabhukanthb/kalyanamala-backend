@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 
 const Profile = require('../models/Profile');
@@ -248,8 +249,22 @@ function generateProfilePrefix(gender) {
   return `KM-${yy}${mm}${genderCode}`;
 }
 
+async function generateProfileId(gender) {
+  const prefix = generateProfilePrefix(gender);
+
+  const lastProfile = await Profile.findOne({ profileId: new RegExp(`^${prefix}`) })
+    .sort({ createdAt: -1 });
+
+  let sequence = 1;
+  if (lastProfile?.profileId) {
+    sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
+  }
+
+  return `${prefix}${String(sequence).padStart(5, '0')}`;
+}
+
 // ==========================================
-// CREATE PROFILE
+// CREATE PROFILE (self)
 // ==========================================
 router.post('/', authMiddleware, profileValidation, async (req, res) => {
   try {
@@ -279,17 +294,7 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       });
     }
 
-    const prefix = generateProfilePrefix(req.body.gender);
-
-    const lastProfile = await Profile.findOne({ profileId: new RegExp(`^${prefix}`) })
-      .sort({ createdAt: -1 });
-
-    let sequence = 1;
-    if (lastProfile?.profileId) {
-      sequence = parseInt(lastProfile.profileId.slice(-5), 10) + 1;
-    }
-
-    const profileId = `${prefix}${String(sequence).padStart(5, '0')}`;
+    const profileId = await generateProfileId(req.body.gender);
 
     const profile = await Profile.create({
       profileId,
@@ -324,11 +329,11 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
       incomeCurrency: 'INR',
 
       currentAddress: {
-        streetName: safeString(req.body.currentAddress?.streetName || req.body['currentAddress[streetName]']),
-        city: safeString(req.body.currentAddress?.city || req.body['currentAddress[city]']),
-        state: safeString(req.body.currentAddress?.state || req.body['currentAddress[state]']),
-        country: safeString(req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India'),
-        pinCode: safeString(req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]'])
+        streetName: safeString(req.body.currentAddress?.streetName),
+        city: safeString(req.body.currentAddress?.city),
+        state: safeString(req.body.currentAddress?.state),
+        country: safeString(req.body.currentAddress?.country || 'India'),
+        pinCode: safeString(req.body.currentAddress?.pinCode)
       },
 
       photos: Array.isArray(req.body.photos) ? req.body.photos.slice(0, 3) : [],
@@ -352,6 +357,139 @@ router.post('/', authMiddleware, profileValidation, async (req, res) => {
     });
   }
 });
+
+// ==========================================
+// ADMIN / SUBADMIN: CREATE USER + PROFILE
+// ==========================================
+const adminCreateValidation = [
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('phone').matches(/^[0-9]{10}$/).withMessage('Phone must be 10 digits'),
+  body('firstName').trim().notEmpty().withMessage('First name is required'),
+  body('lastName').trim().notEmpty().withMessage('Last name is required'),
+  ...profileValidation
+];
+
+router.post(
+  '/admin-create',
+  authMiddleware,
+  requireRole('admin', 'subadmin'),
+  adminCreateValidation,
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: errors.array().map((e) => ({
+            field: e.path,
+            message: e.msg
+          }))
+        });
+      }
+
+      const { email, phone, firstName, lastName } = req.body;
+
+      const existingUser = await User.findOne({ $or: [{email},{phone}] });
+      if (existingUser) {
+        return res.status(400).json({
+          error: 'User already exists',
+          message: existingUser.email === email
+            ? 'Email already registered'
+            : 'Phone already registered'
+        });
+      }
+
+      // Temporary password the admin shares with the user
+      const namePart = safeString(firstName)
+        .replace(/[^a-zA-Z]/g, '')
+        .toUpperCase()
+        .slice(0, 4)
+        .padEnd(4, 'X');
+      const tempPassword = `KM-${namePart}-${String(phone).slice(-4)}`;
+
+      const hashedPassword = await bcrypt.hash(
+        tempPassword,
+        parseInt(process.env.BCRYPT_ROUNDS || '10', 10)
+      );
+
+      const newUser = await User.create({
+        email,
+        phone,
+        firstName: safeString(firstName),
+        lastName: safeString(lastName),
+        password: hashedPassword,
+        role: 'user',
+        status: 'active',
+        isActive: true,
+        passwordResetRequired: true
+      });
+
+      const profileId = await generateProfileId(req.body.gender);
+
+      const profile = await Profile.create({
+        profileId,
+        userId: newUser._id,
+
+        gender: req.body.gender,
+        dateOfBirth: req.body.dateOfBirth,
+        heightFeet: Number(req.body.heightFeet),
+        heightInches: Number(req.body.heightInches),
+
+        religion: req.body.religion,
+        caste: 'Mala',
+        subCaste: req.body.subCaste,
+        siblingsCount: Number(req.body.siblingsCount),
+        maritalStatus: req.body.maritalStatus,
+
+        fatherName: safeString(req.body.fatherName),
+        fatherOccupation: safeString(req.body.fatherOccupation),
+        motherName: safeString(req.body.motherName),
+        motherOccupation: safeString(req.body.motherOccupation),
+
+        highestEducation: req.body.highestEducation,
+        fieldOfStudy: safeString(req.body.fieldOfStudy),
+        college: safeString(req.body.college),
+        occupation: safeString(req.body.occupation),
+        employmentType: safeString(req.body.employmentType),
+        companyName: safeString(req.body.companyName),
+        jobTitle: safeString(req.body.jobTitle),
+        jobLocation: safeString(req.body.jobLocation),
+        industry: safeString(req.body.industry),
+        income: Number(req.body.income),
+        incomeCurrency: 'INR',
+
+        currentAddress: {
+          streetName: safeString(req.body.currentAddress?.streetName),
+          city: safeString(req.body.currentAddress?.city),
+          state: safeString(req.body.currentAddress?.state),
+          country: safeString(req.body.currentAddress?.country || 'India'),
+          pinCode: safeString(req.body.currentAddress?.pinCode)
+        },
+
+        photos: Array.isArray(req.body.photos) ? req.body.photos.slice(0, 3) : [],
+        aboutMe: safeString(req.body.aboutMe),
+        preferredMatch: safeString(req.body.preferredMatch || 'any_religion'),
+
+        createdByAdmin: req.userId,
+        approvalStatus: 'pending',
+        showInSearch: false
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'User and profile created successfully',
+        tempPassword,
+        profile
+      });
+    } catch (error) {
+      console.error('Admin create profile error:', error);
+      return res.status(500).json({
+        error: 'Failed to create user and profile',
+        message: error.message
+      });
+    }
+  }
+);
 
 // ==========================================
 // GET MY PROFILE
@@ -432,11 +570,11 @@ router.put('/me', authMiddleware, profileValidation, async (req, res) => {
     profile.incomeCurrency = 'INR';
 
     profile.currentAddress = {
-      streetName: safeString(req.body.currentAddress?.streetName || req.body['currentAddress[streetName]']),
-      city: safeString(req.body.currentAddress?.city || req.body['currentAddress[city]']),
-      state: safeString(req.body.currentAddress?.state || req.body['currentAddress[state]']),
-      country: safeString(req.body.currentAddress?.country || req.body['currentAddress[country]'] || 'India'),
-      pinCode: safeString(req.body.currentAddress?.pinCode || req.body['currentAddress[pinCode]'])
+      streetName: safeString(req.body.currentAddress?.streetName),
+      city: safeString(req.body.currentAddress?.city),
+      state: safeString(req.body.currentAddress?.state),
+      country: safeString(req.body.currentAddress?.country || 'India'),
+      pinCode: safeString(req.body.currentAddress?.pinCode)
     };
 
     profile.aboutMe = safeString(req.body.aboutMe);
