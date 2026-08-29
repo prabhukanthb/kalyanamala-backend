@@ -313,6 +313,7 @@ router.put(
 // =========================
 router.post(
   '/reset-password',
+  authMiddleware,
   body('emailOrPhone').notEmpty().withMessage('Email or phone is required'),
   async (req, res) => {
     try {
