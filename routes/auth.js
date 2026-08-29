@@ -309,7 +309,7 @@ router.put(
 );
 
 // =========================
-// RESET PASSWORD
+// RESET PASSWORD (admin-triggered)
 // =========================
 router.post(
   '/reset-password',
@@ -353,7 +353,6 @@ router.post(
       return res.status(200).json({
         success: true,
         message: 'Password reset successfully'
-        newPassword
       });
     } catch (error) {
       return res.status(500).json({
