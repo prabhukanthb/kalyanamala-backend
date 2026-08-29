@@ -351,7 +351,7 @@ router.post(
 
       return res.status(200).json({
         success: true,
-        message: 'Password reset successfully',
+        message: 'Password reset successfully'
         newPassword
       });
     } catch (error) {
