@@ -47,7 +47,8 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/version', (req, res) => {
-  res.json({ success: true, version: '1.0.0' });
+res.json({ success: true, version: '1.0.1-admin-create' });
+
 });
 
 app.use('/api/auth', authRoutes);
