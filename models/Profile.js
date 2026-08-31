@@ -407,5 +407,5 @@ profileSchema.pre('save', function (next) {
   this.calculateCompletion();
   next();
 });
-
+profileSchema.index({ gender: 1, dateOfBirth: 1, approvalStatus: 1 });
 module.exports = mongoose.model('Profile', profileSchema);
