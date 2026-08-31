@@ -622,6 +622,58 @@ router.get('/', authMiddleware, requireRole('admin', 'subadmin'), async (req, re
   }
 });
 
+// GET /api/profiles/browse
+router.get('/browse', auth, async (req, res) => {
+  try {
+    const role = req.user.role;
+    const isAdmin = role === 'admin' || role === 'subadmin' || req.user.isAdmin === true;
+
+    if (isAdmin) {
+      const all = await Profile.find({ user: { $ne: req.user._id } })
+        .populate('user', 'firstName lastName surname')
+        .select('-__v')
+        .sort({ createdAt: -1 });
+
+      return res.json({ profiles: all });
+    }
+
+    const me = await Profile.findOne({ user: req.user._id });
+    if (!me) {
+      return res.status(400).json({ message: 'Please create your profile first.' });
+    }
+    if (!me.gender || !me.dateOfBirth) {
+      return res.status(400).json({ message: 'Complete your gender and date of birth to browse.' });
+    }
+
+    const myDob = new Date(me.dateOfBirth);
+
+    const filter = {
+      approvalStatus: 'Approved',
+      user: { $ne: req.user._id }
+    };
+
+    if (me.gender === 'female') {
+      filter.gender = 'male';
+      filter.dateOfBirth = { $lt: myDob };
+    } else {
+      filter.gender = 'female';
+      filter.dateOfBirth = { $gte: myDob };
+    }
+
+    const profiles = await Profile.find(filter)
+      .populate('user', 'firstName lastName surname')
+      .select('-__v')
+      .sort({ createdAt: -1 });
+
+    res.json({ profiles });
+  } catch (err) {
+    console.error('browse error:', err);
+    res.status(500).json({ message: err.message || 'Failed to load profiles' });
+  }
+});
+
+
+
 // ==========================================
 // ADMIN / SUBADMIN: GET PROFILE BY ID
 // ==========================================
