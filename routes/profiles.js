@@ -622,22 +622,21 @@ router.get('/', authMiddleware, requireRole('admin', 'subadmin'), async (req, re
   }
 });
 
-// GET /api/profiles/browse
-router.get('/browse', auth, async (req, res) => {
+// ==========================================
+// BROWSE PROFILES
+// ==========================================
+router.get('/browse', authMiddleware, async (req, res) => {
   try {
-    const role = req.user.role;
-    const isAdmin = role === 'admin' || role === 'subadmin' || req.user.isAdmin === true;
+    const isAdmin = req.userRole === 'admin' || req.userRole === 'subadmin';
 
     if (isAdmin) {
-      const all = await Profile.find({ user: { $ne: req.user._id } })
-        .populate('user', 'firstName lastName surname')
-        .select('-__v')
+      const all = await Profile.find({ userId: { $ne: req.userId } })
+        .populate('userId', 'firstName lastName surname')
         .sort({ createdAt: -1 });
-
-      return res.json({ profiles: all });
+      return res.status(200).json({ success: true, profiles: all });
     }
 
-    const me = await Profile.findOne({ user: req.user._id });
+    const me = await Profile.findOne({ userId: req.userId });
     if (!me) {
       return res.status(400).json({ message: 'Please create your profile first.' });
     }
@@ -648,8 +647,9 @@ router.get('/browse', auth, async (req, res) => {
     const myDob = new Date(me.dateOfBirth);
 
     const filter = {
-      approvalStatus: 'Approved',
-      user: { $ne: req.user._id }
+      approvalStatus: 'approved',
+      showInSearch: true,
+      userId: { $ne: req.userId }
     };
 
     if (me.gender === 'female') {
@@ -661,18 +661,15 @@ router.get('/browse', auth, async (req, res) => {
     }
 
     const profiles = await Profile.find(filter)
-      .populate('user', 'firstName lastName surname')
-      .select('-__v')
+      .populate('userId', 'firstName lastName surname')
       .sort({ createdAt: -1 });
 
-    res.json({ profiles });
+    return res.status(200).json({ success: true, profiles });
   } catch (err) {
-    console.error('browse error:', err);
-    res.status(500).json({ message: err.message || 'Failed to load profiles' });
+    console.error('Browse profiles error:', err);
+    return res.status(500).json({ message: err.message || 'Failed to load profiles' });
   }
 });
-
-
 
 // ==========================================
 // ADMIN / SUBADMIN: GET PROFILE BY ID
