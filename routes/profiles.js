@@ -630,9 +630,11 @@ router.get('/browse', authMiddleware, async (req, res) => {
     const isAdmin = req.userRole === 'admin' || req.userRole === 'subadmin';
 
     if (isAdmin) {
+
       const all = await Profile.find({ userId: { $ne: req.userId } })
-        .populate('userId', 'firstName lastName surname')
+        .populate('userId', 'firstName lastName surname email phone role status')
         .sort({ createdAt: -1 });
+      
       return res.status(200).json({ success: true, profiles: all });
     }
 
